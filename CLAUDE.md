@@ -20,9 +20,11 @@ Background research: `..\.docs\l2-client-patch-research.md`.
   - `Recipes/` – mapping files -> operations with the approved styles (`RecipeDefaults`: badges 20 px br, debuff tags 8 px tl in CC/DOT/STAT colours).
   - `Manifests/` – manifest schema 1 model and strict parser; `Signing/` – ECDSA P-256 detached signature of manifest.json.
   - `Installation/` – per-file install state machine (`PatchInstaller`), Option.ini presets (`OptionPresetInstaller`), file-system/process abstractions; `Ini/` – Option.ini merge.
-- `src/L2Mod.Cli` – .NET 10 CLI: `list`, `export`, `replace`, `badge` for DXT1 textures in `.utx` packages (Phase 2 adds the leader commands).
+- `src/L2Mod.Cli` – .NET 10 CLI: `list`, `export`, `replace`, `badge` for DXT1 textures in `.utx` packages, plus the leader commands `keygen`, `build`, `sign`, `verify`, `publish` (dry run until hosting is chosen); see `recipes/README.md`.
+- `src/L2Mod.Core/Publishing` – recipe project loader/compiler, manifest writer, dist builder/verifier, signing keys.
+- `recipes/recipes.json` – the leader's pack list (4 packs, all referencing `mappings/`); bump `version` on every change. `keys/` holds only the public key.
 - `mappings/dances-songs.txt` – Dance/Song icon -> equivalent buff icon (badge) mapping (installed).
-- `mappings/chants.txt` (22 chant/Overlord badges), `mappings/debuff-tags.txt` (90 debuff tags: CC/DOT/STAT) – approved by the user on 2026-10-19 for the CP launcher packs.
+- `mappings/chants.txt` (22 chant/Overlord badges), `mappings/debuff-tags.txt` (90 debuff tags: CC/DOT/STAT), `mappings/mob-debuff-tags.txt` (25 monster/boss debuff tags) – approved by the user on 2026-10-19 for the CP launcher packs.
 - `spikes/AvaloniaSpike` – throwaway Phase 0 spike (single-file publish measurements, references `L2Mod.Core`); `spikes/sheets/*.py` – review sheet helpers (need user-site Pillow, run without `-I`).
 - CP launcher plan: `..\.docs\cp-launcher-v1-plan.md`.
 - `tests/L2Mod.Core.Tests` – xUnit (also covers the CLI's `CommandLine`); `TestPackageBuilder`/`TestIcons` build synthetic L2-style packages, `Fakes.cs` has in-memory file system, process monitor and asset store.

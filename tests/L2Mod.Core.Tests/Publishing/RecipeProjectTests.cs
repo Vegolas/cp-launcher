@@ -180,12 +180,18 @@ public class RecipeProjectTests
         RecipeProject project = RecipeProject.Load(Path.Combine(root, "recipes"));
         CompiledRecipes compiled = RecipeCompiler.Compile(project);
 
-        Assert.Equal(new[] { "dance-song-badges", "chant-badges", "debuff-tags" }, project.Packs.Select(pack => pack.Id));
+        Assert.Equal(new[] { "dance-song-badges", "chant-badges", "debuff-tags", "mob-debuff-tags" }, project.Packs.Select(pack => pack.Id));
         string mappings = Path.Combine(root, "mappings");
         Assert.Equal(
-            new[] { Path.Combine(mappings, "dances-songs.txt"), Path.Combine(mappings, "chants.txt"), Path.Combine(mappings, "debuff-tags.txt") },
+            new[]
+            {
+                Path.Combine(mappings, "dances-songs.txt"),
+                Path.Combine(mappings, "chants.txt"),
+                Path.Combine(mappings, "debuff-tags.txt"),
+                Path.Combine(mappings, "mob-debuff-tags.txt"),
+            },
             project.Packs.Select(pack => pack.MappingPath));
-        Assert.Equal(new[] { 22, 22, 90 }, compiled.Packs.Select(pack => pack.Entries.Count));
+        Assert.Equal(new[] { 22, 22, 90, 25 }, compiled.Packs.Select(pack => pack.Entries.Count));
         Assert.All(compiled.Packs[0].Operations.Concat(compiled.Packs[1].Operations), operation => Assert.Equal(20, Assert.IsType<BadgeOperation>(operation).Style.Size));
         var manifest = new Manifest(
             1,

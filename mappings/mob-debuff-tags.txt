@@ -1,0 +1,63 @@
+# APPROVED 2026-10-19 (user approved all 25 incl. Surrender icons and bosses) - monster (NPC skill) debuff icon -> category tag.
+# Format: <texture> <CC|DOT|STAT>  # name (NPC skill ids; who casts it)
+# Same colours/tag as mappings/debuff-tags.txt. Only icons that exist in work/original/Icon.utx and are not in debuff-tags.txt.
+# L2Dex = Interlude x300 server on a Classic client (l2dex.net). So: WHO casts what = Interlude server data,
+# WHICH icon a skill id shows = Classic client data.
+# Sources:
+#  - Interlude NPC skill lists + spawns: aCis-based datapack github.com/Elfocrash/L2jTesla (data/xml/npcs, data/xml/skills,
+#    sql/spawnlist.sql, AI scripts). Mob counts below = spawned monsters (type Monster) that have the skill.
+#  - Icon per skill id: l2hub.info/lu4/skills (Classic client data); cross-checked with the <icon> fields of the
+#    L2J Mobius Classic 3.5 datapack (github.com/messiassouza/L2J_Mobius_Classic_3.5_TalesUntold) - both agree for every entry.
+#  - L2Dex's own skillgrp is AAC-encrypted, so the id -> icon mapping on L2Dex itself is NOT verified.
+# Already covered by debuff-tags.txt (NPC skills reuse player icons): Stun 4072/4073/4075/4120/4584 (0100/0101/0092),
+# Bleed 4088/4579/4596/4597 (0096), Decrease Speed 4076/4599/4643 (1160), Ice Bolt slow 4034/4153/4249 (1184),
+# Silence 4098 (1064), Paralysis 4117/4118 (1170), Flame 4104 (1100), Decrease Accuracy 4119 (1222), Decrease P.Def 4592-4594 (0122),
+# Hot Springs Rheumatism 4551 (1164), raid-boss Hold/Sleep/Poison/Decrease MP/Atk.Spd (1201/1069/1168/1102/1206), Raid Curse silence 4215 (1064).
+# Left out: skill0000 (generic placeholder icon, also on NPC buffs), Cancel 4094/4177 (1056, instant), Hate 4663 (0028),
+# Blinding Blow 5084 (0321), MP Drain 4039/4154 (instant), NPC self-buffs, Hot Springs Cholera/Flu/Malaria 4552-4554
+# (lu4 icons 4552_1..4554_1 are not in Icon.utx; Classic 3.5 data points them to skill1164, which is already tagged).
+# Unverified extras that exist in Icon.utx, add if seen on L2Dex: skill4280_new/4281_new/4282_new Surrender to Water/Wind/Earth
+# (STAT, 4463-4465, no spawned IL monster uses them); skill4082 Poison of Death (DOT, quest chest trap 4082/4243);
+# skill5076_a Death Penalty (STAT, not a monster skill); skill4267/skill6209_1/skill6213_1 grade penalties (STAT, not monster skills).
+
+# --- Regular monsters (farming) ---
+
+# CC - stun, sleep, hold/root, paralyze, fear, silence, confusion
+skill4046  CC    # Sleep (4046, 4640; 24 mobs lv 20-80, e.g. Dre Vanul Beholder, Excuro, Eye of Watchman)
+skill4047  CC    # Hold (4047, 4581, 4657, 4658; 38 mobs lv 16-80, e.g. Dark Horror, Black Willow, Bone Caster)
+skill5081  CC    # Silence (5081 - blocks physical skills; 4 Primeval Isle dinosaurs lv 83-86)
+skill5083  CC    # Stun (5083; 5 Primeval Isle dinosaurs lv 84-85)
+skill5085  CC    # Anesthesia (5085 - stun; Sprigant on Primeval Isle, AI script)
+skill4111  CC    # Raid Curse (4515 - petrify when 9+ lv above a raid boss; also Antharas petrify 4111)
+
+# DOT - poison, bleed, burn, HP/MP drain over time
+skill4035  DOT   # Poison (4035, 4582, 4320; 51 mobs lv 16-80, e.g. Ant Larva, Ant Soldier, Arachnid Predator)
+skill4036  DOT   # Poison (4036, 4649, Toxic Smoke 4259; 21 mobs lv 25-80, e.g. Corrupted Knight, Behemoth Zombie)
+skill5086  DOT   # Deadly Poison (5086; Sprigant on Primeval Isle, AI script)
+
+# STAT - lowered stats, speed, resistances, healing received
+skill4037  STAT  # Weakness (4037, 4580, 4603 - P.Atk; 11 mobs lv 28-80, e.g. Hames Orc Shaman, Leogul)
+skill4038  STAT  # Shackle (4038 - Atk.Spd; 24 mobs lv 18-80, e.g. Cursed Seer, Doom Servant, Catacomb Liviona)
+# Note: the three Surrender icons below are also the icons of the monster passives Fire/Dark/Holy Vulnerability (4279/4336/4275).
+skill4279_new  STAT  # Surrender to Fire (4102, 4605; 8 mobs lv 54-82, e.g. Marsh Stalker, Magma Drake)
+skill4336_new  STAT  # Surrender to Dark (4466; 4 mobs lv 80, e.g. Triol's Believer)
+skill4275_new  STAT  # Surrender to Holy (4467; 3 mobs lv 80, e.g. Warrior Monk, Silent Seeker)
+
+# --- Epic/raid bosses (AI scripts) ---
+
+# CC
+skill4106  CC    # Antharas Stun (4106, front slam)
+skill4107  CC    # Antharas Tail (4107, stun + knock-up)
+skill4108  CC    # Antharas Fear (4108, 5092)
+skill4688  CC    # Valakas Tail (4688, stun + knock-up)
+skill4689  CC    # Valakas Fear (4689)
+skill5012  CC    # Breath of Scarlet (5012, Frintezza - stun)
+skill5016  CC    # Yoke of Scarlet (5016, Frintezza - paralyze)
+
+# DOT
+skill4683  DOT   # Valakas Dragon Breath (4683, burn)
+
+# STAT
+skill4109  STAT  # Curse of Antharas (4109, combat stats down)
+skill4018  STAT  # Queen Ant Strike (4018, speed)
+skill4019  STAT  # Queen Ant Sprinkle (4019, speed)

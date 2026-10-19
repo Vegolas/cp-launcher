@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "2026.10.19.1",
+  "version": "2026.10.19.2",
   "enabled": true,
   "packs": [
     {
@@ -26,6 +26,14 @@
       "default": true,
       "type": "tag",
       "mapping": "../mappings/debuff-tags.txt"
+    },
+    {
+      "id": "mob-debuff-tags",
+      "name": "Tagi debuffów potworów",
+      "description": "Te same kolorowe kwadraty na debuffach rzucanych przez potwory i bossów epickich (sen, hold, trucizny, osłabienia).",
+      "default": true,
+      "type": "tag",
+      "mapping": "../mappings/mob-debuff-tags.txt"
     }
   ],
   "announcements": [],
