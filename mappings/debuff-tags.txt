@@ -1,0 +1,112 @@
+# APPROVED 2026-10-19 (user reviewed the sheet) - debuff icon -> category tag.
+# Format: <texture> <CC|DOT|STAT>  # name (classes)
+# Colours (planned): CC #E02020 red, DOT #A040FF purple, STAT #FF9900 orange. Tag = 8x8, top-left corner.
+# Source: lineage.pmfun.com class lists (Interlude/H5-era data, not pure Classic) - verify names on L2Dex.
+# Player-cast debuffs only; monster debuffs (skill4xxx icons) are not covered yet.
+# Tags also show on the caster's own skill window / shortcut bar (same texture).
+# Left out: undead/angel-only skills (Holy Aura 0107, Banish Undead 0405, Banish Seraph 0450, Hold Undead 1042,
+# Turn Undead 1400, Sanctuary 0097), instant/aggro/target effects (Trick, Switch, Charm, Aura of Hate, Aggression,
+# Lure, Veil, Provoke, Wrath, Blinding Blow, Repose, Requiem, Cancellation, Peace, Forget, Serenade of Eva, Betray,
+# Erase, Mana Burn, Mana Storm, Aura Flash).
+# Unverified extras that exist in Icon.utx (l2hub "lu4" Classic data), add if they show up on L2Dex:
+# 0352 Shield Bash, 0353 Shield Slam, 0358 Bluff, 0361 Shock Blast, 0362 Armor Crush, 0367 Rhythm of Medusa,
+# 1336 Curse of Doom, 1462 Seal of Blockade, 1508 Thorn Root (CC); 0927 Burning Chop, 0949 Onslaught of Pa'agrio (DOT);
+# 0354 Hamstring Shot, 0493 Knock, 0762 Insane Crusher, 0767 Expose Weak Point, 0777 Demolition Impact,
+# 0991 Throwing Dagger, 0997 Crushing Strike, 1338 Arcane Chaos, 1339-1343 Vortex, 1367 Seal of Disease,
+# 1454 Diamond Dust, 1495 Vampiric Mist (STAT).
+
+# CC - stun, sleep, hold/root, paralyze, fear, silence, confusion
+skill0002  CC    # Confusion (SK, BD, AW, PR)
+skill0048  CC    # Thunder Storm (Warlord) - stun
+skill0065  CC    # Horror (DA) - fear
+skill0092  CC    # Shield Stun (Pal, DA)
+skill0098  CC    # Sword Symphony (SwS) - fear
+skill0100  CC    # Stun Attack (1st prof.)
+skill0101  CC    # Stunning Shot (Hawk, SR, PR)
+skill0120  CC    # Stunning Fist (Orc Monk)
+skill0260  CC    # Hammer Crush (Glad, Destro, OL, WC, BH, WS) - stun
+skill0279  CC    # Lightning Strike (SK) - paralyze
+skill0281  CC    # Soul Breaker (Tyrant) - stun
+skill0402  CC    # Arrest (TK, SwS, SK, BD) - hold
+skill0403  CC    # Shackle (Pal, DA) - hold
+skill0404  CC    # Mass Shackling (Pal) - hold
+skill0452  CC    # Shock Stomp (Warlord) - stun
+skill1064  CC    # Silence (Necro, SH)
+skill1069  CC    # Sleep (Sorc, Necro, Bishop, SpS, EE, SH)
+skill1072  CC    # Sleeping Cloud (Sorc, SpS)
+skill1092  CC    # Fear (OL, WC)
+skill1097  CC    # Dreaming Spirit (OL, WC) - sleep
+skill1105  CC    # Madness (OL, WC) - confusion
+skill1163  CC    # Curse Discord (Necro) - confusion
+skill1169  CC    # Curse Fear (Sorc, Necro, SpS, SH)
+skill1170  CC    # Anchor (Necro) - paralyze
+skill1201  CC    # Dryad Root (Prophet, SE) - hold
+skill1208  CC    # Seal of Binding (OL) - hold
+skill1213  CC    # Seal of Mirage (OL) - confusion
+skill1246  CC    # Seal of Silence (OL)
+skill1272  CC    # Word of Fear (Prophet)
+skill1381  CC    # Mass Fear (Necro)
+skill1394  CC    # Trance (Bishop, EE) - sleep
+
+# DOT - poison, bleed, burn, HP/MP drain over time
+skill0084  DOT   # Poison Blade Dance (BD)
+skill0096  DOT   # Bleed (TH, PW, AW)
+skill0103  DOT   # Corpse Plague (DA, SK) - poison
+skill0129  DOT   # Poison (SK, BD, AW, PR)
+skill0223  DOT   # Sting (SK, BD, AW, PR) - bleed
+skill1095  DOT   # Venom (WC) - poison
+skill1100  DOT   # Chill Flame (Orc Mystic)
+skill1101  DOT   # Blaze Quake (Orc Shaman)
+skill1102  DOT   # Aura Sink (WC) - MP drain
+skill1107  DOT   # Frost Flame (Orc Shaman)
+skill1108  DOT   # Seal of Flame (OL)
+skill1167  DOT   # Poisonous Cloud (Necro, SH)
+skill1168  DOT   # Curse: Poison (Necro, SH, PS)
+skill1183  DOT   # Freezing Shackle (SpS)
+skill1209  DOT   # Seal of Poison (OL)
+skill1210  DOT   # Seal of Gloom (OL) - MP drain
+skill1233  DOT   # Decay (Sorc)
+skill1237  DOT   # Ice Dagger (SpS) - bleed
+skill1244  DOT   # Freezing Flame (WC)
+skill1289  DOT   # Inferno (Sorc) - burn
+
+# STAT - lowered stats, speed, resistances, healing received
+skill0095  STAT  # Cripple (Tyrant) - speed
+skill0102  STAT  # Entangle (TK, SwS, PW, SR) - speed
+skill0105  STAT  # Freezing Strike (SK, BD, AW, PR) - speed
+skill0115  STAT  # Power Break (SK, BD, AW, PR) - P.Atk
+skill0116  STAT  # Howl (Warlord) - P.Atk
+skill0122  STAT  # Hex (SK, BD, AW, PR) - P.Def
+skill0127  STAT  # Hamstring (DA) - speed
+skill0400  STAT  # Tribunal (Pal, TK) - crit rate
+skill0401  STAT  # Judgment (DA, SK) - crit power
+skill0407  STAT  # Psycho Symphony (SwS) - speeds
+skill0408  STAT  # Demonic Blade Dance (BD) - P./M.Atk
+skill0412  STAT  # Sand Bomb (TH, PW, AW) - accuracy
+skill1071  STAT  # Surrender To Water (SpS)
+skill1074  STAT  # Surrender To Wind (Sorc, SH)
+skill1083  STAT  # Surrender To Fire (Sorc)
+skill1096  STAT  # Seal of Chaos (OL) - accuracy
+skill1099  STAT  # Seal of Slow (OL) - speed
+skill1104  STAT  # Seal of Winter (OL) - Atk.Spd
+skill1160  STAT  # Slow (Sorc, SH)
+skill1164  STAT  # Curse: Weakness (Necro, SpS) - P.Atk
+skill1184  STAT  # Ice Bolt (1st prof. mystics) - speed
+skill1206  STAT  # Wind Shackle (ES, EE, PS, SE) - Atk.Spd
+skill1222  STAT  # Curse Chaos (Necro, SH) - accuracy
+skill1223  STAT  # Surrender To Earth (SpS)
+skill1224  STAT  # Surrender To Poison (SH)
+skill1236  STAT  # Frost Bolt (SpS) - speed
+skill1247  STAT  # Seal of Scourge (OL) - no HP regen
+skill1248  STAT  # Seal of Suspension (OL) - reuse delay
+skill1263  STAT  # Curse Gloom (Necro) - M.Def
+skill1269  STAT  # Curse Disease (Necro) - healing received
+skill1290  STAT  # Blizzard (SpS) - speed
+skill1291  STAT  # Demon Wind (SH) - healing received
+skill1298  STAT  # Mass Slow (Necro)
+skill1382  STAT  # Mass Gloom (Necro) - M.Def
+skill1383  STAT  # Mass Surrender to Fire (Warlock)
+skill1384  STAT  # Mass Surrender to Water (ES)
+skill1385  STAT  # Mass Surrender to Wind (PS)
+skill1386  STAT  # Arcane Disruption (Warlock) - Casting speed
+skill1396  STAT  # Magical Backfire (Bishop) - MP cost

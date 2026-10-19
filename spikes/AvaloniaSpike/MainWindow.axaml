@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AvaloniaSpike"
+        x:Class="AvaloniaSpike.MainWindow"
+        x:DataType="local:MainViewModel"
+        Title="CP Launcher – spike"
+        Width="520" Height="360">
+  <DockPanel Margin="16">
+    <TextBlock DockPanel.Dock="Bottom" Text="{Binding Status}" Margin="0,12,0,0" />
+    <StackPanel DockPanel.Dock="Left" Spacing="8" Margin="0,0,16,0">
+      <Image Source="{Binding Icon}" Width="128" Height="128" />
+      <TextBlock Text="{Binding IconStatus, StringFormat='Icon.utx: {0}'}" />
+    </StackPanel>
+    <StackPanel Spacing="8">
+      <TextBlock Text="Paczki" FontWeight="SemiBold" />
+      <ItemsControl ItemsSource="{Binding Packs}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:PackItem">
+            <CheckBox Content="{Binding Name}" IsChecked="{Binding IsEnabled}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button Content="Zastosuj" Command="{Binding ApplyCommand}" />
+    </StackPanel>
+  </DockPanel>
+</Window>

@@ -1,0 +1,31 @@
+# Corner badges for Dances and Songs: <target icon> <badge icon>  # label
+# Texture names from Icon.utx (skill_i group). Mapping follows Classic skill effects; L2Dex may tweak them.
+# Left out on purpose (no buff with the same effect): 305 Song of Vengeance, 309 Dance of Earth Guard,
+# 311 Dance of Protection, 363 Song of Meditation, 364 Song of Champion, 366 Dance of Shadow,
+# 529 Song of Elemental, 530 Dance of Alignment, 914 Song of Purification.
+
+# Dances
+skill0271  skill1068  # Dance of Warrior -> Might (P.Atk)
+skill0272  skill1240  # Dance of Inspiration -> Guidance (Accuracy)
+skill0273  skill1059  # Dance of Mystic -> Empower (M.Atk)
+skill0274  skill1242  # Dance of Fire -> Death Whisper (Crit damage)
+skill0275  skill1086  # Dance of Fury -> Haste (Atk.Spd)
+skill0276  skill1085  # Dance of Concentration -> Acumen (Casting speed)
+skill0277  skill1043  # Dance of Light -> Holy Weapon (Holy attack)
+skill0307  skill1182  # Dance of Aqua Guard -> Resist Aqua
+skill0310  skill1268  # Dance of Vampire -> Vampiric Rage
+skill0365  skill1303  # Dance of Siren -> Wild Magic (M.Crit)
+skill0915  skill1062  # Dance of Berserker -> Berserker Spirit
+
+# Songs
+skill0264  skill1040  # Song of Earth -> Shield (P.Def)
+skill0265  skill1044  # Song of Life -> Regeneration (HP regen)
+skill0266  skill1087  # Song of Water -> Agility (Evasion)
+skill0267  skill1036  # Song of Warding -> Magic Barrier (M.Def)
+skill0268  skill1204  # Song of Wind -> Wind Walk (Speed)
+skill0269  skill1077  # Song of Hunter -> Focus (Crit rate)
+skill0270  skill1393  # Song of Invocation -> Unholy Resistance (Dark resist)
+skill0304  skill1045  # Song of Vitality -> Bless the Body (Max HP)
+skill0306  skill1191  # Song of Flame Guard -> Resist Fire
+skill0308  skill1189  # Song of Storm Guard -> Resist Wind
+skill0349  skill1397  # Song of Renewal -> Clarity (MP cost, partial match)

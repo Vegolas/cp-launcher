@@ -1,0 +1,30 @@
+# APPROVED 2026-10-19 (user reviewed the sheet) - Warcryer chants and Overlord buffs -> equivalent Prophet buff (badge).
+# Source of chant names/effects: lineage.pmfun.com/list/skill/c52 (icon file names = texture names).
+# Left out: 1229 Chant of Life (heal over time, not a regen buff), 1284 Chant of Revenge (reflect, no
+# Prophet equivalent), 1519 Chant of Blood Awakening (combo), 1535 Chant of Movement (effect unknown).
+
+skill1007  skill1068  # Chant of Battle -> Might (P.Atk)
+skill1390  skill1068  # War Chant -> Might (P.Atk)
+skill1009  skill1040  # Chant of Shielding -> Shield (P.Def)
+skill1391  skill1040  # Earth Chant -> Shield (P.Def)
+skill1006  skill1036  # Chant of Fire -> Magic Barrier (M.Def)
+skill1002  skill1085  # Flame Chant -> Acumen (Casting speed)
+skill1251  skill1086  # Chant of Fury -> Haste (Atk.Spd)
+skill1252  skill1087  # Chant of Evasion -> Agility (Evasion)
+skill1253  skill1242  # Chant of Rage -> Death Whisper (Crit damage)
+skill1308  skill1077  # Chant of Predator -> Focus (Crit rate)
+skill1309  skill1240  # Chant of Eagle -> Guidance (Accuracy)
+skill1310  skill1268  # Chant of Vampire -> Vampiric Rage
+
+# Overlord party/clan buffs (source: lineage.pmfun.com/list/skill/c51). Left out: 1305 Honor of Pa'agrio
+# and 1306 Ritual of Life (instant CP), 1001/1283 (self toggles).
+skill1003  skill1068  # Pa'agrian Gift -> Might (P.Atk)
+skill1004  skill1085  # Wisdom of Pa'agrio -> Acumen (Casting speed)
+skill1005  skill1040  # Blessings of Pa'agrio -> Shield (P.Def)
+skill1008  skill1036  # Glory of Pa'agrio -> Magic Barrier (M.Def)
+skill1249  skill1240  # Vision of Pa'agrio -> Guidance (Accuracy)
+skill1250  skill1243  # Protection of Pa'agrio -> Bless Shield (Shield def. rate)
+skill1256  skill1044  # Heart of Pa'agrio -> Regeneration (HP regen, closest)
+skill1260  skill1087  # Tact of Pa'agrio -> Agility (Evasion)
+skill1261  skill1062  # Rage of Pa'agrio -> Berserker Spirit
+skill1282  skill1204  # Pa'agrian Haste -> Wind Walk (Speed)

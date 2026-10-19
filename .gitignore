@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+*.user
+.env
+node_modules/
+dist/
+
+# copies of game files and generated previews (NCSoft assets)
+work/
+
+# spike publish outputs
+spikes/**/out/
