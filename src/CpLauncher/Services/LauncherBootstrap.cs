@@ -1,10 +1,14 @@
 using System.Text;
 using L2Mod.Core.Installation;
+using L2Mod.Core.Updates;
 
 namespace CpLauncher.Services;
 
 /// <summary>The composed services plus notes for the main screen (bad arguments, damaged settings).</summary>
 public sealed record LauncherStartup(LauncherServices Services, IReadOnlyList<string> Notes);
+
+/// <summary>What the process provides to the services: the updater, the way to quit, HTTP and the log.</summary>
+public sealed record LauncherHost(LauncherUpdates Updates, ILauncherLifetime Lifetime, HttpClient HttpClient, LauncherLog Log);
 
 /// <summary>Builds the services from the command line; the window supplies the dialogs.</summary>
 public static class LauncherBootstrap
@@ -15,7 +19,8 @@ public static class LauncherBootstrap
         IProcessMonitor processes,
         IGameStarter gameStarter,
         IUserDialogs dialogs,
-        string? environmentDataDirectory)
+        string? environmentDataDirectory,
+        LauncherHost host)
     {
         var notes = new List<string>(options.Problems);
         LauncherPaths paths = LauncherPaths.Resolve(options.DataDirectory, environmentDataDirectory);
@@ -33,14 +38,18 @@ public static class LauncherBootstrap
             }
         }
 
-        var sources = new ManifestSourceFactory(fileSystem, ManifestSourceFactory.CreateHttpClient());
-        var services = new LauncherServices(fileSystem, processes, paths, keys, sources, gameStarter, dialogs);
+        var sources = new ManifestSourceFactory(fileSystem, host.HttpClient);
+        var services = new LauncherServices(fileSystem, processes, paths, keys, sources, gameStarter, dialogs, host.Updates, host.Lifetime)
+        {
+            Log = host.Log,
+        };
         if (services.SettingsProblem is not null)
         {
             notes.Add(services.SettingsProblem);
         }
 
         ApplyOverrides(services, options, notes);
+        RememberSkippedVersion(services, notes);
         return new LauncherStartup(services, notes);
     }
 
@@ -72,6 +81,26 @@ public static class LauncherBootstrap
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {
             notes.Add($"Nie udało się zapisać ustawień z linii poleceń: {exception.Message}");
+        }
+    }
+
+    /// <summary>A version whose install failed or that was rolled back is not offered again.</summary>
+    private static void RememberSkippedVersion(LauncherServices services, List<string> notes)
+    {
+        LauncherVersion? skipped = services.Updates.VersionToSkip;
+        if (skipped is null)
+        {
+            return;
+        }
+
+        services.Log.Write($"Launcher {skipped} will not be offered again on this computer.");
+        try
+        {
+            services.Settings.Update(settings => settings with { SkippedLauncherVersion = skipped.ToString() });
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            notes.Add($"Nie udało się zapamiętać pominiętej wersji launchera: {exception.Message}");
         }
     }
 }

@@ -19,6 +19,15 @@ public sealed record LauncherPaths(string DataDirectory)
         }
     }
 
+    /// <summary>See <see cref="LauncherLog"/>.</summary>
+    public string LogPath
+    {
+        get
+        {
+            return Path.Combine(DataDirectory, "launcher.log");
+        }
+    }
+
     /// <summary>Root of the download cache; <see cref="DirectoryAssetStore"/> reads assets from its "assets" folder.</summary>
     public string CacheDirectory
     {

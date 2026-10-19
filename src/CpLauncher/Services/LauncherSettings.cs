@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using L2Mod.Core.Installation;
 using L2Mod.Core.Manifests;
+using L2Mod.Core.Updates;
 
 namespace CpLauncher.Services;
 
@@ -20,6 +21,23 @@ public sealed record LauncherSettings
     public string GameExecutable { get; init; } = GameExecutables.Default;
 
     public Dictionary<string, bool> PackSelection { get; init; } = new Dictionary<string, bool>(StringComparer.Ordinal);
+
+    /// <summary>A launcher version not to offer again on this computer: its install failed or it was rolled back.</summary>
+    public string? SkippedLauncherVersion { get; init; }
+
+    [JsonIgnore]
+    public LauncherVersion? SkippedVersion
+    {
+        get
+        {
+            if (LauncherVersion.TryParse(SkippedLauncherVersion, out LauncherVersion? version))
+            {
+                return version;
+            }
+
+            return null;
+        }
+    }
 
     public static LauncherSettings Default
     {

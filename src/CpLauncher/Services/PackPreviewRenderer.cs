@@ -14,52 +14,12 @@ public sealed record PackPreview(string PackId, IReadOnlyList<PreviewIcon> Icons
 
 /// <summary>
 /// Renders pack thumbnails locally from the member's own Icon.utx, so nothing from NCSoft is distributed.
-/// Operations are drawn on the original (the backup, when our patch is installed), never on a patched file,
+/// Operations are drawn on the original (<see cref="PatchInstaller.ReadOriginal"/>), never on a patched file,
 /// where badges would stack.
 /// </summary>
 public sealed class PackPreviewRenderer
 {
     public const int MaxIconsPerPack = 6;
-
-    private readonly IFileSystem _fileSystem;
-
-    public PackPreviewRenderer(IFileSystem fileSystem)
-    {
-        _fileSystem = fileSystem;
-    }
-
-    /// <summary>The backed-up original when there is a valid one, otherwise the client file; null when neither exists.</summary>
-    public byte[]? ReadOriginal(InstallerOptions options)
-    {
-        try
-        {
-            InstalledFile? installed = new InstallStateStore(_fileSystem, options.StatePath).Load().Get(ClientFiles.IconUtx);
-            if (installed is not null)
-            {
-                string backup = options.GetBackupPath(ClientFiles.IconUtx, installed.OriginalSha256);
-                if (_fileSystem.FileExists(backup))
-                {
-                    byte[] bytes = _fileSystem.ReadAllBytes(backup);
-                    if (ContentHash.Matches(installed.OriginalSha256, bytes))
-                    {
-                        return bytes;
-                    }
-                }
-            }
-        }
-        catch (InvalidDataException)
-        {
-            // A damaged state.json is reported by the installer; the preview just uses the client file.
-        }
-
-        string clientPath = options.GetClientPath(ClientFiles.IconUtx);
-        if (!_fileSystem.FileExists(clientPath))
-        {
-            return null;
-        }
-
-        return _fileSystem.ReadAllBytes(clientPath);
-    }
 
     public IReadOnlyList<PackPreview> Render(byte[] iconUtx, Manifest manifest, IAssetStore assets)
     {

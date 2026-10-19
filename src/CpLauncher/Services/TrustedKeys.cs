@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Security.Cryptography;
 
 namespace CpLauncher.Services;
@@ -52,55 +51,6 @@ public static class TrustedKeys
         catch (Exception exception) when (exception is ArgumentException or CryptographicException)
         {
             return false;
-        }
-    }
-}
-
-public static class LauncherVersion
-{
-    public static Version Current
-    {
-        get
-        {
-            Version? version = typeof(LauncherVersion).Assembly.GetName().Version;
-            if (version is null)
-            {
-                return new Version(0, 0, 0);
-            }
-
-            return new Version(version.Major, version.Minor, Math.Max(version.Build, 0));
-        }
-    }
-
-    /// <summary>True when <paramref name="candidate"/> (manifest launcher.version, "1.2.3") is newer than <paramref name="current"/>.</summary>
-    public static bool IsNewer(string? candidate, Version current)
-    {
-        if (!Version.TryParse(candidate, out Version? parsed))
-        {
-            return false;
-        }
-
-        var normalized = new Version(parsed.Major, parsed.Minor, Math.Max(parsed.Build, 0));
-        return normalized > current;
-    }
-
-    public static string InformationalVersion
-    {
-        get
-        {
-            AssemblyInformationalVersionAttribute? attribute = typeof(LauncherVersion).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-            if (attribute is null)
-            {
-                return Current.ToString(3);
-            }
-
-            int plus = attribute.InformationalVersion.IndexOf('+');
-            if (plus > 0)
-            {
-                return attribute.InformationalVersion[..plus];
-            }
-
-            return attribute.InformationalVersion;
         }
     }
 }

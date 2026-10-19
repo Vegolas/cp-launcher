@@ -8,6 +8,8 @@ using L2Mod.Core.Imaging;
 using L2Mod.Core.Installation;
 using L2Mod.Core.Signing;
 using L2Mod.Core.Tests;
+using L2Mod.Core.Tests.Updates;
+using L2Mod.Core.Updates;
 
 namespace CpLauncher.Tests;
 
@@ -92,15 +94,21 @@ public static class TestManifests
 }
 
 /// <summary>
-/// A client in C:\client (synthetic Icon.utx, L2.exe, L2Updater.exe, Option.ini), launcher data in C:\data and a
-/// folder source in C:\source, all in memory, plus a throwaway signing key generated per test.
+/// A client in C:\client (synthetic Icon.utx, L2.exe, L2Updater.exe, Option.ini), launcher data in C:\data, a
+/// folder source in C:\source and an https source (<see cref="HttpSource"/>), all in memory, plus a throwaway
+/// signing key generated per test. The launcher 1.0.0 runs from <see cref="LauncherPath"/>; its updater works
+/// on the fakes of the Core update tests.
 /// </summary>
 public sealed class LauncherFixture
 {
     public const string ClientDirectory = @"C:\client";
     public const string DataDirectory = @"C:\data";
     public const string SourceDirectory = @"C:\source";
+    public const string HttpSource = "https://cdn.example.test/cp/";
+    public const string LauncherPath = @"C:\Games\CpLauncher\CpLauncher.exe";
     public const string OriginalOptionIni = "[Video]\r\nEffectDetail=2\r\nTextureDetail=1\r\n";
+
+    public static readonly LauncherVersion CurrentVersion = LauncherVersion.Parse("1.0.0");
 
     public LauncherFixture()
     {
@@ -117,6 +125,21 @@ public sealed class LauncherFixture
     public FakeDialogs Dialogs { get; } = new FakeDialogs();
 
     public FakeGameStarter Game { get; } = new FakeGameStarter();
+
+    public StubHttpHandler Http { get; } = new StubHttpHandler();
+
+    public InMemoryUpdateFileSystem UpdateFiles { get; } = new InMemoryUpdateFileSystem();
+
+    public FakeDownloadClient Downloads { get; } = new FakeDownloadClient();
+
+    /// <summary>Launcher processes the updater started (hand-off, rollback).</summary>
+    public RecordingProcessStarter Launchers { get; } = new RecordingProcessStarter();
+
+    public RecordingDelay Delay { get; } = new RecordingDelay();
+
+    public FakeInstanceLock InstanceLock { get; } = new FakeInstanceLock();
+
+    public FakeLifetime Lifetime { get; } = new FakeLifetime();
 
     public SigningKeyPair Key { get; } = ManifestSignature.GenerateKeyPair();
 
@@ -183,6 +206,43 @@ public sealed class LauncherFixture
         FileSystem.Seed(Path.Combine(SourceDirectory, "assets", $"{TestManifests.OverlayHash}.png"), TestManifests.OverlayPng);
     }
 
+    /// <summary>Serves a signed manifest from <see cref="HttpSource"/>.</summary>
+    public void PublishHttp(JsonObject manifest)
+    {
+        byte[] bytes = TestManifests.Serialize(manifest);
+        Http.Add("/cp/manifest.json", bytes);
+        Http.Add("/cp/manifest.json.sig", ManifestSignature.Sign(bytes, Key.PrivateKeyPem));
+    }
+
+    /// <summary>A manifest that offers <paramref name="release"/> as launcher <paramref name="version"/>, served by
+    /// <see cref="HttpSource"/> (the exe through <see cref="Downloads"/>).</summary>
+    public void PublishRelease(byte[] release, string version = "1.0.1")
+    {
+        JsonObject manifest = Manifest();
+        string url = $"launcher/CpLauncher-{version}.exe";
+        manifest["launcher"] = new JsonObject
+        {
+            ["version"] = version,
+            ["url"] = url,
+            ["sha256"] = ContentHash.Sha256Hex(release),
+        };
+        PublishHttp(manifest);
+        Downloads.Serve(new Uri(new Uri(HttpSource), url), release);
+    }
+
+    public LauncherUpdates CreateUpdates(UpdateStartupInfo? startup = null)
+    {
+        return new LauncherUpdates(CurrentVersion, startup ?? UpdateStartupInfo.None, baseUri =>
+        {
+            return new UpdateService(new UpdateOptions(LauncherPath, CurrentVersion, baseUri), InstanceLock, UpdateFiles, Downloads, Launchers, Delay);
+        });
+    }
+
+    public LauncherHost CreateHost(UpdateStartupInfo? startup = null)
+    {
+        return new LauncherHost(CreateUpdates(startup), Lifetime, new HttpClient(Http), LauncherLog.None);
+    }
+
     public void TakeSourceOffline()
     {
         FileSystem.DeleteFile(Path.Combine(SourceDirectory, "manifest.json"));
@@ -195,23 +255,20 @@ public sealed class LauncherFixture
         return new[] { new TrustedKey("test", Key.PublicKeyPem, development) };
     }
 
-    public LauncherServices CreateServices(LauncherSettings? settings = null, bool developmentKey = false)
+    public LauncherServices CreateServices(LauncherSettings? settings = null, bool developmentKey = false, UpdateStartupInfo? startup = null)
     {
         if (settings is not null)
         {
             new SettingsStore(FileSystem, Paths.SettingsPath).Save(settings);
         }
 
-        var sources = new ManifestSourceFactory(FileSystem, new HttpClient(new StubHttpHandler()));
-        return new LauncherServices(FileSystem, Processes, Paths, TrustedKeys(developmentKey), sources, Game, Dialogs)
-        {
-            CurrentVersion = new Version(1, 0, 0),
-        };
+        var sources = new ManifestSourceFactory(FileSystem, new HttpClient(Http));
+        return new LauncherServices(FileSystem, Processes, Paths, TrustedKeys(developmentKey), sources, Game, Dialogs, CreateUpdates(startup), Lifetime);
     }
 
-    public async Task<DashboardViewModel> CreateDashboardAsync(LauncherSettings? settings = null, bool developmentKey = false)
+    public async Task<DashboardViewModel> CreateDashboardAsync(LauncherSettings? settings = null, bool developmentKey = false, UpdateStartupInfo? startup = null)
     {
-        LauncherServices services = CreateServices(settings ?? Settings, developmentKey);
+        LauncherServices services = CreateServices(settings ?? Settings, developmentKey, startup);
         var dashboard = new DashboardViewModel(services, () =>
         {
             return Task.CompletedTask;
@@ -228,6 +285,16 @@ public sealed class LauncherFixture
     public string ReadOptionIni()
     {
         return Encoding.ASCII.GetString(FileSystem.ReadAllBytes(OptionIniPath));
+    }
+}
+
+public sealed class FakeLifetime : ILauncherLifetime
+{
+    public int Shutdowns { get; private set; }
+
+    public void Shutdown()
+    {
+        Shutdowns++;
     }
 }
 

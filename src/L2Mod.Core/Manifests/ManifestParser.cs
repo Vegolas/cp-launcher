@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using L2Mod.Core.Badges;
@@ -6,6 +7,7 @@ using L2Mod.Core.Imaging;
 using L2Mod.Core.Ini;
 using L2Mod.Core.Operations;
 using L2Mod.Core.Recipes;
+using L2Mod.Core.Updates;
 
 namespace L2Mod.Core.Manifests;
 
@@ -71,10 +73,10 @@ public static partial class ManifestParser
     {
         RequireObject(root, "the manifest");
         int schema = GetRequiredInt(root, "schema");
-        var messages = new List<string>();
+        var notes = new List<ManifestNote>();
         if (schema != SupportedSchema)
         {
-            return ReadEnvelopeOnly(root, schema, messages);
+            return ReadEnvelopeOnly(root, schema, notes);
         }
 
         string version = GetRequiredString(root, "version", 64);
@@ -85,17 +87,17 @@ public static partial class ManifestParser
 
         bool enabled = GetRequiredBool(root, "enabled");
         LauncherRelease? launcher = ReadLauncher(root);
-        IReadOnlyDictionary<string, IReadOnlyList<string>> originals = ReadSupportedOriginals(root, messages);
-        IReadOnlyList<Announcement> announcements = ReadAnnouncements(root, limits, messages);
-        IReadOnlyList<Pack> packs = ReadPacks(root, limits, messages);
-        IReadOnlyList<OptionPreset> presets = ReadPresets(root, limits, messages);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> originals = ReadSupportedOriginals(root, notes);
+        IReadOnlyList<Announcement> announcements = ReadAnnouncements(root, limits, notes);
+        IReadOnlyList<Pack> packs = ReadPacks(root, limits, notes);
+        IReadOnlyList<OptionPreset> presets = ReadPresets(root, limits, notes);
         var manifest = new Manifest(schema, version, enabled, launcher, originals, announcements, packs, presets);
-        return new ManifestReadResult(manifest, messages);
+        return new ManifestReadResult(manifest, notes);
     }
 
-    private static ManifestReadResult ReadEnvelopeOnly(JsonElement root, int schema, List<string> messages)
+    private static ManifestReadResult ReadEnvelopeOnly(JsonElement root, int schema, List<ManifestNote> notes)
     {
-        messages.Add($"Manifest schema {schema} is not supported by this launcher (it reads schema {SupportedSchema}); packs and presets are skipped. Update the launcher.");
+        notes.Add(Note(ManifestNoteCode.UnsupportedSchema, $"Manifest schema {schema} is not supported by this launcher (it reads schema {SupportedSchema}); packs and presets are skipped. Update the launcher."));
         string version = TryGetString(root, "version") ?? string.Empty;
         bool enabled = true;
         if (root.TryGetProperty("enabled", out JsonElement enabledElement) && enabledElement.ValueKind == JsonValueKind.False)
@@ -110,7 +112,7 @@ public static partial class ManifestParser
         }
         catch (FormatError error)
         {
-            messages.Add($"Launcher entry ignored: {error.Message}.");
+            notes.Add(Note(ManifestNoteCode.LauncherIgnored, $"Launcher entry ignored: {error.Message}."));
         }
 
         var manifest = new Manifest(
@@ -122,7 +124,7 @@ public static partial class ManifestParser
             Array.Empty<Announcement>(),
             Array.Empty<Pack>(),
             Array.Empty<OptionPreset>());
-        return new ManifestReadResult(manifest, messages);
+        return new ManifestReadResult(manifest, notes);
     }
 
     private static LauncherRelease? ReadLauncher(JsonElement root)
@@ -133,10 +135,12 @@ public static partial class ManifestParser
         }
 
         RequireObject(element, "launcher");
-        string version = GetRequiredString(element, "version", 32);
-        if (!LauncherVersionPattern().IsMatch(version))
+
+        // The same rules as the updater, so the leader's build rejects a version members would ignore.
+        string version = GetRequiredString(element, "version", LauncherVersion.MaxLength);
+        if (!LauncherVersion.TryParse(version, out _))
         {
-            throw new FormatError($"launcher version '{version}' must look like 1.2.3");
+            throw new FormatError($"launcher version '{Shorten(version)}' must look like 1.2.3 (SemVer, no leading zeros)");
         }
 
         string url = GetRequiredString(element, "url", 256);
@@ -148,7 +152,7 @@ public static partial class ManifestParser
         return new LauncherRelease(version, url, GetRequiredSha256(element, "sha256"));
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadSupportedOriginals(JsonElement root, List<string> messages)
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadSupportedOriginals(JsonElement root, List<ManifestNote> notes)
     {
         JsonElement element = GetRequiredProperty(root, "supportedOriginals");
         RequireObject(element, "supportedOriginals");
@@ -157,7 +161,7 @@ public static partial class ManifestParser
         {
             if (!ClientFiles.IsPatchable(property.Name))
             {
-                messages.Add($"supportedOriginals: '{Shorten(property.Name)}' is not a patchable file; ignored.");
+                notes.Add(Note(ManifestNoteCode.OriginalIgnored, $"supportedOriginals: '{Shorten(property.Name)}' is not a patchable file; ignored."));
                 continue;
             }
 
@@ -191,7 +195,7 @@ public static partial class ManifestParser
         return originals;
     }
 
-    private static IReadOnlyList<Announcement> ReadAnnouncements(JsonElement root, ManifestLimits limits, List<string> messages)
+    private static IReadOnlyList<Announcement> ReadAnnouncements(JsonElement root, ManifestLimits limits, List<ManifestNote> notes)
     {
         var announcements = new List<Announcement>();
         if (!root.TryGetProperty("announcements", out JsonElement element) || element.ValueKind == JsonValueKind.Null)
@@ -206,7 +210,7 @@ public static partial class ManifestParser
             number++;
             if (announcements.Count >= limits.MaxAnnouncements)
             {
-                messages.Add($"Only the first {limits.MaxAnnouncements} announcements are shown.");
+                notes.Add(Note(ManifestNoteCode.AnnouncementLimit, $"Only the first {limits.MaxAnnouncements} announcements are shown."));
                 break;
             }
 
@@ -216,7 +220,8 @@ public static partial class ManifestParser
             }
             catch (FormatError error)
             {
-                messages.Add($"Announcement {number} skipped: {error.Message}.");
+                string message = $"Announcement {number} skipped: {error.Message}.";
+                notes.Add(new ManifestNote(ManifestNoteCode.AnnouncementSkipped, error.Reason, null, GetItemText(item, "title"), message));
             }
         }
 
@@ -237,7 +242,7 @@ public static partial class ManifestParser
         return new Announcement(parsed, title, text);
     }
 
-    private static IReadOnlyList<Pack> ReadPacks(JsonElement root, ManifestLimits limits, List<string> messages)
+    private static IReadOnlyList<Pack> ReadPacks(JsonElement root, ManifestLimits limits, List<ManifestNote> notes)
     {
         JsonElement element = GetRequiredProperty(root, "packs");
         RequireArray(element, "packs");
@@ -250,7 +255,7 @@ public static partial class ManifestParser
             number++;
             if (packs.Count >= limits.MaxPacks)
             {
-                messages.Add($"Only the first {limits.MaxPacks} packs are used; the rest are skipped.");
+                notes.Add(Note(ManifestNoteCode.PackLimit, $"Only the first {limits.MaxPacks} packs are used; the rest are skipped."));
                 break;
             }
 
@@ -260,12 +265,12 @@ public static partial class ManifestParser
                 Pack pack = ReadPack(item, limits);
                 if (ids.Contains(pack.Id))
                 {
-                    throw new FormatError("another pack has the same id");
+                    throw new FormatError("another pack has the same id", ManifestSkipReason.DuplicateId);
                 }
 
                 if (totalOperations + pack.Operations.Count > limits.MaxOperationsTotal)
                 {
-                    throw new FormatError($"the manifest would exceed {limits.MaxOperationsTotal} operations in total");
+                    throw new FormatError($"the manifest would exceed {limits.MaxOperationsTotal} operations in total", ManifestSkipReason.OverLimit);
                 }
 
                 ids.Add(pack.Id);
@@ -274,7 +279,8 @@ public static partial class ManifestParser
             }
             catch (FormatError error)
             {
-                messages.Add($"Pack '{label}' skipped: {error.Message}.");
+                string message = $"Pack '{label}' skipped: {error.Message}.";
+                notes.Add(new ManifestNote(ManifestNoteCode.PackSkipped, error.Reason, GetItemText(item, "id"), GetItemText(item, "name"), message));
             }
         }
 
@@ -297,7 +303,7 @@ public static partial class ManifestParser
 
         if (count > limits.MaxOperationsPerPack)
         {
-            throw new FormatError($"it has {count} operations; the limit is {limits.MaxOperationsPerPack}");
+            throw new FormatError($"it has {count} operations; the limit is {limits.MaxOperationsPerPack}", ManifestSkipReason.OverLimit);
         }
 
         var operations = new List<IIconOperation>();
@@ -311,7 +317,7 @@ public static partial class ManifestParser
             }
             catch (FormatError error)
             {
-                throw new FormatError($"operation {number}: {error.Message}");
+                throw new FormatError($"operation {number}: {error.Message}", error.Reason);
             }
         }
 
@@ -335,21 +341,21 @@ public static partial class ManifestParser
                 fields = OverlayFields;
                 break;
             default:
-                throw new FormatError($"unknown op '{Shorten(kind)}' (this launcher knows {string.Join(", ", OperationKinds.All)})");
+                throw new FormatError($"unknown op '{Shorten(kind)}' (this launcher knows {string.Join(", ", OperationKinds.All)})", ManifestSkipReason.UnknownOperation);
         }
 
         foreach (JsonProperty property in element.EnumerateObject())
         {
             if (!fields.Contains(property.Name, StringComparer.Ordinal))
             {
-                throw new FormatError($"unknown field '{Shorten(property.Name)}' in a {kind} operation");
+                throw new FormatError($"unknown field '{Shorten(property.Name)}' in a {kind} operation", ManifestSkipReason.UnknownField);
             }
         }
 
         string file = GetRequiredString(element, "file", 64);
         if (!ClientFiles.IsPatchable(file))
         {
-            throw new FormatError($"file '{Shorten(file)}' is not allowed (allowed: {string.Join(", ", ClientFiles.Patchable)})");
+            throw new FormatError($"file '{Shorten(file)}' is not allowed (allowed: {string.Join(", ", ClientFiles.Patchable)})", ManifestSkipReason.FileNotAllowed);
         }
 
         file = ClientFiles.GetCanonicalName(file);
@@ -398,7 +404,7 @@ public static partial class ManifestParser
         }
     }
 
-    private static IReadOnlyList<OptionPreset> ReadPresets(JsonElement root, ManifestLimits limits, List<string> messages)
+    private static IReadOnlyList<OptionPreset> ReadPresets(JsonElement root, ManifestLimits limits, List<ManifestNote> notes)
     {
         var presets = new List<OptionPreset>();
         if (!root.TryGetProperty("optionPresets", out JsonElement element) || element.ValueKind == JsonValueKind.Null)
@@ -414,7 +420,7 @@ public static partial class ManifestParser
             number++;
             if (presets.Count >= limits.MaxPresets)
             {
-                messages.Add($"Only the first {limits.MaxPresets} presets are used; the rest are skipped.");
+                notes.Add(Note(ManifestNoteCode.PresetLimit, $"Only the first {limits.MaxPresets} presets are used; the rest are skipped."));
                 break;
             }
 
@@ -424,14 +430,15 @@ public static partial class ManifestParser
                 OptionPreset preset = ReadPreset(item, limits);
                 if (!ids.Add(preset.Id))
                 {
-                    throw new FormatError("another preset has the same id");
+                    throw new FormatError("another preset has the same id", ManifestSkipReason.DuplicateId);
                 }
 
                 presets.Add(preset);
             }
             catch (FormatError error)
             {
-                messages.Add($"Preset '{label}' skipped: {error.Message}.");
+                string message = $"Preset '{label}' skipped: {error.Message}.";
+                notes.Add(new ManifestNote(ManifestNoteCode.PresetSkipped, error.Reason, GetItemText(item, "id"), GetItemText(item, "name"), message));
             }
         }
 
@@ -465,7 +472,7 @@ public static partial class ManifestParser
 
                 if (key.Name.StartsWith(ForbiddenPresetKeyPrefix, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new FormatError($"it sets {qualified}; window position keys ({ForbiddenPresetKeyPrefix}*) are not allowed");
+                    throw new FormatError($"it sets {qualified}; window position keys ({ForbiddenPresetKeyPrefix}*) are not allowed", ManifestSkipReason.ForbiddenKey);
                 }
 
                 if (key.Value.ValueKind != JsonValueKind.String)
@@ -495,7 +502,7 @@ public static partial class ManifestParser
 
         if (values.Count > limits.MaxPresetValues)
         {
-            throw new FormatError($"it sets {values.Count} values; the limit is {limits.MaxPresetValues}");
+            throw new FormatError($"it sets {values.Count} values; the limit is {limits.MaxPresetValues}", ManifestSkipReason.OverLimit);
         }
 
         return new OptionPreset(id, name, values);
@@ -692,6 +699,37 @@ public static partial class ManifestParser
         return Shorten(id);
     }
 
+    /// <summary>A string field of an item that may be invalid, made safe to show: shortened, control
+    /// characters replaced by spaces; null when missing or blank.</summary>
+    private static string? GetItemText(JsonElement item, string name)
+    {
+        string? value = TryGetString(item, name);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var text = new StringBuilder();
+        foreach (char c in Shorten(value))
+        {
+            if (char.IsControl(c))
+            {
+                text.Append(' ');
+            }
+            else
+            {
+                text.Append(c);
+            }
+        }
+
+        return text.ToString();
+    }
+
+    private static ManifestNote Note(ManifestNoteCode code, string message)
+    {
+        return new ManifestNote(code, ManifestSkipReason.None, null, null, message);
+    }
+
     private static string Shorten(string value)
     {
         const int MaxLength = 64;
@@ -724,9 +762,6 @@ public static partial class ManifestParser
     [GeneratedRegex("^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}\\z", RegexOptions.CultureInvariant)]
     private static partial Regex VersionPattern();
 
-    [GeneratedRegex("^[0-9]+\\.[0-9]+\\.[0-9]+\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex LauncherVersionPattern();
-
     [GeneratedRegex("^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*\\z", RegexOptions.CultureInvariant)]
     private static partial Regex RelativePathPattern();
 
@@ -748,8 +783,17 @@ public static partial class ManifestParser
     private sealed class FormatError : Exception
     {
         public FormatError(string message)
-            : base(message)
+            : this(message, ManifestSkipReason.InvalidValue)
         {
         }
+
+        public FormatError(string message, ManifestSkipReason reason)
+            : base(message)
+        {
+            Reason = reason;
+        }
+
+        /// <summary>Why the item is skipped, when the error skips one item instead of the whole manifest.</summary>
+        public ManifestSkipReason Reason { get; }
     }
 }

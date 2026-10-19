@@ -351,6 +351,35 @@ public class UpdateServiceTests
     }
 
     [Fact]
+    public async Task ForwardedArguments_FollowEveryStartedLauncher()
+    {
+        string[] forwarded = { "--data", @"D:\portable\data" };
+        UpdateService old = CreateService(Options(ExePath, V100) with { ForwardedArguments = forwarded });
+        await old.ApplyAndRestartAsync(await DownloadAsync(old));
+        SeedHandOff();
+
+        await CreateService(Options(ExePath, V101) with { ForwardedArguments = forwarded }).InstallAndRestartAsync(InstallUpdateOver100);
+
+        Assert.Equal(
+            new[]
+            {
+                new[] { "--install-update", "1.0.0", "--data", @"D:\portable\data" },
+                new[] { "--updated-from", "1.0.0", "--data", @"D:\portable\data" },
+            },
+            _processes.Started.Select(started => started.Arguments.ToArray()));
+    }
+
+    [Fact]
+    public void ForwardedArguments_MustNotCarryUpdateOptions()
+    {
+        UpdateOptions options = Options(ExePath, V100) with { ForwardedArguments = new[] { "--data", @"D:\d", "--updated-from", "0.9.0" } };
+
+        Assert.Throws<ArgumentException>(() => CreateService(options));
+        Assert.True(UpdateStartupInfo.ContainsUpdateOption(new[] { "--install-rollback" }));
+        Assert.False(UpdateStartupInfo.ContainsUpdateOption(new[] { "--data", "--INSTALL-UPDATE" }));
+    }
+
+    [Fact]
     public async Task Install_WaitsUntilThePreviousLauncherHasExited()
     {
         SeedHandOff();

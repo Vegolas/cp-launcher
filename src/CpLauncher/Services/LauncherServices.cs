@@ -1,4 +1,5 @@
 using L2Mod.Core.Installation;
+using L2Mod.Core.Updates;
 
 namespace CpLauncher.Services;
 
@@ -42,7 +43,9 @@ public sealed class LauncherServices
         IReadOnlyList<TrustedKey> trustedKeys,
         ManifestSourceFactory sources,
         IGameStarter gameStarter,
-        IUserDialogs dialogs)
+        IUserDialogs dialogs,
+        LauncherUpdates updates,
+        ILauncherLifetime lifetime)
     {
         FileSystem = fileSystem;
         Processes = processes;
@@ -51,13 +54,15 @@ public sealed class LauncherServices
         Sources = sources;
         GameStarter = gameStarter;
         Dialogs = dialogs;
+        Updates = updates;
+        Lifetime = lifetime;
         SettingsStore = new SettingsStore(fileSystem, paths.SettingsPath);
         SettingsLoadResult loaded = SettingsStore.Load();
         Settings = new SettingsService(SettingsStore, loaded.Settings);
         SettingsProblem = loaded.Problem;
         Manifests = new ManifestService(fileSystem, paths, trustedKeys);
         Assets = new AssetCache(fileSystem, paths);
-        Previews = new PackPreviewRenderer(fileSystem);
+        Previews = new PackPreviewRenderer();
     }
 
     public IFileSystem FileSystem { get; }
@@ -87,5 +92,17 @@ public sealed class LauncherServices
 
     public PackPreviewRenderer Previews { get; }
 
-    public Version CurrentVersion { get; init; } = LauncherVersion.Current;
+    public LauncherUpdates Updates { get; }
+
+    public ILauncherLifetime Lifetime { get; }
+
+    public LauncherLog Log { get; init; } = LauncherLog.None;
+
+    public LauncherVersion CurrentVersion
+    {
+        get
+        {
+            return Updates.CurrentVersion;
+        }
+    }
 }

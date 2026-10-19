@@ -22,11 +22,12 @@
     <ProjectReference Include="..\..\src\CpLauncher\CpLauncher.csproj" />
   </ItemGroup>
 
-  <!-- Synthetic L2-style packages and the in-memory fakes, shared with the engine tests (linked, not copied). -->
+  <!-- Synthetic L2-style packages and the in-memory fakes (installer, updater), shared with the engine tests (linked, not copied). -->
   <ItemGroup>
     <Compile Include="..\L2Mod.Core.Tests\Fakes.cs" Link="Shared\Fakes.cs" />
     <Compile Include="..\L2Mod.Core.Tests\TestIcons.cs" Link="Shared\TestIcons.cs" />
     <Compile Include="..\L2Mod.Core.Tests\TestPackageBuilder.cs" Link="Shared\TestPackageBuilder.cs" />
+    <Compile Include="..\L2Mod.Core.Tests\Updates\UpdateFakes.cs" Link="Shared\UpdateFakes.cs" />
   </ItemGroup>
 
 </Project>

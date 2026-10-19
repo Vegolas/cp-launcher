@@ -7,13 +7,15 @@ using L2Mod.Core;
 using L2Mod.Core.Ini;
 using L2Mod.Core.Installation;
 using L2Mod.Core.Manifests;
+using L2Mod.Core.Updates;
 
 namespace CpLauncher.ViewModels;
 
 /// <summary>
 /// The main screen: manifest and Icon.utx status, packs with previews, Apply / Restore original, Option.ini
-/// presets, announcements and "Uruchom L2Dex". All file changes go through Core's <see cref="PatchInstaller"/> and
-/// <see cref="OptionPresetInstaller"/>, which also enforce the game-running guard.
+/// presets, announcements, "Uruchom L2Dex" and the launcher update. All file changes go through Core's
+/// <see cref="PatchInstaller"/> and <see cref="OptionPresetInstaller"/>, which also enforce the game-running
+/// guard; the launcher update goes through Core's <see cref="UpdateService"/>.
 /// </summary>
 public partial class DashboardViewModel : ObservableObject
 {
@@ -24,10 +26,13 @@ public partial class DashboardViewModel : ObservableObject
     private readonly InstallerOptions _installerOptions;
     private readonly PatchInstaller _installer;
     private readonly OptionPresetInstaller _presetInstaller;
+    private readonly StatusText? _restartNotice;
     private LoadedManifest? _manifest;
     private IManifestSource? _source;
     private PatchFileStatus? _iconStatus;
     private int _statusGeneration;
+    private PendingUpdate? _pendingUpdate;
+    private bool _shuttingDown;
 
     public DashboardViewModel(LauncherServices services, Func<Task> changeClientFolder, IReadOnlyList<string> startupNotes)
     {
@@ -44,6 +49,12 @@ public partial class DashboardViewModel : ObservableObject
         _installerOptions = services.Paths.GetInstallerOptions(clientDirectory);
         _installer = new PatchInstaller(_installerOptions, services.FileSystem, services.Processes);
         _presetInstaller = new OptionPresetInstaller(_installerOptions, services.FileSystem, services.Processes);
+        UpdateStartupInfo? restart = services.Updates.TakeRestartInfo();
+        if (restart is not null)
+        {
+            _restartNotice = StatusTexts.DescribeRestart(restart, services.CurrentVersion, services.Log.Path);
+        }
+
         _manifestSourceText = services.Settings.Current.ManifestSource ?? string.Empty;
         GameExecutableOptions = BuildGameExecutableOptions(services.Settings.Current.GameExecutable);
         _selectedGameExecutable = GameExecutableOptions.First(option => option.RelativePath == services.Settings.Current.GameExecutable);
@@ -61,7 +72,7 @@ public partial class DashboardViewModel : ObservableObject
     {
         get
         {
-            return $"wersja {_services.CurrentVersion.ToString(3)}";
+            return $"wersja {_services.CurrentVersion}";
         }
     }
 
@@ -115,11 +126,17 @@ public partial class DashboardViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RefreshCommand), nameof(ApplyCommand), nameof(RestoreOriginalCommand), nameof(ApplyPresetCommand),
-        nameof(RestoreMySettingsCommand), nameof(LaunchGameCommand), nameof(ChangeClientFolderCommand), nameof(SaveSettingsCommand))]
+        nameof(RestoreMySettingsCommand), nameof(LaunchGameCommand), nameof(ChangeClientFolderCommand), nameof(SaveSettingsCommand),
+        nameof(UpdateLauncherCommand))]
     private bool _isBusy;
 
+    /// <summary>"Dostępna nowa wersja launchera: …" while the manifest offers a newer launcher.</summary>
     [ObservableProperty]
     private string? _updateText;
+
+    /// <summary>Why "Aktualizuj" cannot be used, or how the update is going.</summary>
+    [ObservableProperty]
+    private string? _updateHint;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ApplyCommand))]
@@ -246,6 +263,26 @@ public partial class DashboardViewModel : ObservableObject
         await _changeClientFolder();
     }
 
+    /// <summary>
+    /// Downloads the offered launcher, verifies it against the signed manifest, starts it as the hand-off and
+    /// quits, so the hand-off can put it in place of this exe and start it. Settings are saved on every change,
+    /// so nothing is pending here.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanUpdateLauncher))]
+    private async Task UpdateLauncherAsync()
+    {
+        PendingUpdate? update = _pendingUpdate;
+        if (update is null)
+        {
+            return;
+        }
+
+        await RunBusyAsync(() =>
+        {
+            return InstallUpdateAsync(update);
+        });
+    }
+
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private async Task SaveSettingsAsync()
     {
@@ -287,6 +324,11 @@ public partial class DashboardViewModel : ObservableObject
     private bool IsIdle()
     {
         return !IsBusy;
+    }
+
+    private bool CanUpdateLauncher()
+    {
+        return !IsBusy && _pendingUpdate is not null;
     }
 
     private bool CanApply()
@@ -339,7 +381,8 @@ public partial class DashboardViewModel : ObservableObject
         }
         finally
         {
-            IsBusy = false;
+            // Once the hand-off runs, this launcher only waits to be closed.
+            IsBusy = _shuttingDown;
         }
     }
 
@@ -350,6 +393,11 @@ public partial class DashboardViewModel : ObservableObject
         foreach (string note in _startupNotes)
         {
             Banners.Add(new NoticeViewModel(StatusSeverity.Warning, note));
+        }
+
+        if (_restartNotice is not null)
+        {
+            Banners.Add(new NoticeViewModel(_restartNotice.Severity, _restartNotice.Text));
         }
 
         ManifestLoadResult result;
@@ -394,6 +442,9 @@ public partial class DashboardViewModel : ObservableObject
         Presets.Clear();
         Announcements.Clear();
         UpdateText = null;
+        UpdateHint = null;
+        _pendingUpdate = null;
+        UpdateLauncherCommand.NotifyCanExecuteChanged();
         if (loaded is null)
         {
             ManifestVersionText = "brak";
@@ -423,22 +474,24 @@ public partial class DashboardViewModel : ObservableObject
             Banners.Add(new NoticeViewModel(StatusSeverity.Warning, "Lider CP wyłączył zmiany (wyłącznik awaryjny). Launcher przywraca oryginalny Icon.utx."));
         }
 
-        foreach (string message in loaded.Messages)
+        foreach (ManifestNote note in loaded.Notes)
         {
-            Details.Add(message);
+            Details.Add($"{StatusTexts.DescribeNote(note)} ({note.Message})");
         }
 
-        if (loaded.Messages.Count > 0)
+        if (loaded.Notes.Count > 0)
         {
-            int count = loaded.Messages.Count;
-            Banners.Add(new NoticeViewModel(StatusSeverity.Info, $"Launcher pominął część przepisów ({count} {Polish.Plural(count, "uwaga", "uwagi", "uwag")}) – szczegóły na dole strony."));
+            int count = loaded.Notes.Count;
+            string text = $"Launcher pominął część przepisów ({count} {Polish.Plural(count, "uwaga", "uwagi", "uwag")}) – szczegóły na dole strony.";
+            if (count == 1)
+            {
+                text = $"Launcher pominął część przepisów. {StatusTexts.DescribeNote(loaded.Notes[0])}";
+            }
+
+            Banners.Add(new NoticeViewModel(StatusSeverity.Info, text));
         }
 
-        if (manifest.Launcher is not null && LauncherVersion.IsNewer(manifest.Launcher.Version, _services.CurrentVersion))
-        {
-            UpdateText = $"Dostępna nowa wersja launchera: {manifest.Launcher.Version}";
-        }
-
+        ShowUpdate(loaded);
         PacksEditable = readable && manifest.Enabled;
         LauncherSettings settings = _services.Settings.Current;
         foreach (Pack pack in manifest.Packs)
@@ -459,6 +512,124 @@ public partial class DashboardViewModel : ObservableObject
 
         HasPresets = Presets.Count > 0;
         HasAnnouncements = Announcements.Count > 0;
+    }
+
+    /// <summary>
+    /// Offers a newer launcher from the manifest. It can be downloaded only from the source the manifest came
+    /// from just now, and only over https (http on loopback for local tests): <c>launcher.url</c> is relative
+    /// to that source. A version that failed or was rolled back on this computer is not offered.
+    /// </summary>
+    private void ShowUpdate(LoadedManifest loaded)
+    {
+        LauncherUpdates updates = _services.Updates;
+        LauncherVersion? skipped = _services.Settings.Current.SkippedVersion;
+        UpdateCheckResult check = updates.Create(null).Check(loaded.Manifest, skipped);
+        if (check.Status == UpdateCheckStatus.Skipped)
+        {
+            Details.Add($"Wersja {check.Available} launchera jest pominięta na tym komputerze (nie zainstalowała się albo została wycofana).");
+        }
+        else if (check.Status == UpdateCheckStatus.InvalidRelease)
+        {
+            Details.Add(check.Message);
+        }
+
+        if (!check.IsUpdateAvailable)
+        {
+            return;
+        }
+
+        UpdateText = $"Dostępna nowa wersja launchera: {check.Available}";
+        if (loaded.Origin != ManifestOrigin.Source)
+        {
+            UpdateHint = "Połącz się z internetem i kliknij „Odśwież”, żeby pobrać aktualizację.";
+            return;
+        }
+
+        Uri? releaseBase = LauncherUpdates.GetReleaseBase(_source);
+        if (releaseBase is null)
+        {
+            UpdateHint = "Aktualizację launchera można pobrać tylko ze źródła https://.";
+            return;
+        }
+
+        UpdateService service;
+        try
+        {
+            service = updates.Create(releaseBase);
+        }
+        catch (ArgumentException exception)
+        {
+            UpdateHint = "Aktualizację launchera można pobrać tylko ze źródła https://.";
+            Details.Add(exception.Message);
+            return;
+        }
+
+        UpdateCheckResult downloadable = service.Check(loaded.Manifest, skipped);
+        if (!downloadable.IsUpdateAvailable)
+        {
+            UpdateHint = "Przepisy podają niepoprawny adres nowej wersji launchera.";
+            Details.Add(downloadable.Message);
+            return;
+        }
+
+        _pendingUpdate = new PendingUpdate(service, downloadable);
+        UpdateLauncherCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task InstallUpdateAsync(PendingUpdate update)
+    {
+        UpdateService service = update.Service;
+        LauncherVersion version = update.Check.Available!;
+        _services.Log.Write($"Update to {version}: downloading {update.Check.Release?.Url} from {service.Options.ReleaseBaseUri}.");
+        UpdateHint = "Pobieranie aktualizacji…";
+        await _services.Updates.WaitForCleanupAsync();
+        bool downloading = true;
+        var progress = new Progress<DownloadProgress>(value =>
+        {
+            if (downloading)
+            {
+                UpdateHint = StatusTexts.DescribeDownload(value);
+            }
+        });
+
+        DownloadedUpdate downloaded;
+        try
+        {
+            downloaded = await service.DownloadAndVerifyAsync(update.Check, progress, CancellationToken.None);
+        }
+        catch (UpdateException exception)
+        {
+            downloading = false;
+            FailUpdate("Nie udało się pobrać aktualizacji launchera – spróbuj ponownie później (szczegóły na dole).", exception);
+            return;
+        }
+
+        downloading = false;
+        _services.Log.Write($"Update to {version}: {downloaded.Length} bytes verified (SHA-256 {downloaded.Sha256}).");
+        UpdateHint = "Uruchamianie nowej wersji…";
+        try
+        {
+            await service.ApplyAndRestartAsync(downloaded);
+        }
+        catch (UpdateException exception)
+        {
+            FailUpdate("Pobrana wersja launchera nie uruchomiła się – nic nie zmieniono. Spróbuj ponownie (szczegóły na dole).", exception);
+            return;
+        }
+
+        _services.Log.Write($"Update to {version}: hand-off started, closing.");
+        _shuttingDown = true;
+        UpdateHint = null;
+        LastAction = new NoticeViewModel(StatusSeverity.Success, $"Instaluję wersję {version} launchera – za chwilę uruchomi się ponownie.");
+        _services.Lifetime.Shutdown();
+    }
+
+    private void FailUpdate(string text, UpdateException exception)
+    {
+        _services.Log.Write("Update failed: " + exception.Message);
+        UpdateHint = null;
+        LastAction = new NoticeViewModel(StatusSeverity.Error, text);
+        Details.Add(exception.Message);
     }
 
     private async Task ApplyCoreAsync(bool automatic)
@@ -497,19 +668,13 @@ public partial class DashboardViewModel : ObservableObject
             }
         }
 
-        PatchFileStatus? before = _iconStatus;
         int operationCount = manifest.GetOperations(ClientFiles.IconUtx, selected).Count;
         IReadOnlyList<PatchFileResult> results = await Task.Run(() =>
         {
             return _installer.Apply(manifest, selected, _services.Assets.Store);
         });
         PatchFileResult result = results.Single(item => item.FileName == ClientFiles.IconUtx);
-        StatusText described = StatusTexts.DescribeApply(result, before, operationCount);
-        if (automatic && result.Outcome == PatchOutcome.Restored)
-        {
-            described = new StatusText("Lider CP wyłączył zmiany – przywrócono oryginalny Icon.utx.", StatusSeverity.Success);
-        }
-
+        StatusText described = StatusTexts.DescribeApply(result, operationCount);
         LastAction = new NoticeViewModel(described.Severity, described.Text);
         AddDetails(result);
         if (!automatic && result.Outcome is PatchOutcome.Installed or PatchOutcome.Rebuilt or PatchOutcome.Restored or PatchOutcome.Unchanged)
@@ -584,7 +749,7 @@ public partial class DashboardViewModel : ObservableObject
             PendingText = null;
             if (_manifest is not null)
             {
-                PendingText = StatusTexts.DescribePending(snapshot.Status, manifest, selected, snapshot.Installed);
+                PendingText = StatusTexts.DescribePending(snapshot.Status);
             }
         }
 
@@ -598,12 +763,11 @@ public partial class DashboardViewModel : ObservableObject
         try
         {
             PatchFileStatus status = _installer.GetStatus(manifest, selected).Single(item => item.FileName == ClientFiles.IconUtx);
-            InstalledFile? installed = new InstallStateStore(_services.FileSystem, _installerOptions.StatePath).Load().Get(ClientFiles.IconUtx);
-            return new StatusSnapshot(status, installed, null);
+            return new StatusSnapshot(status, null);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
-            return new StatusSnapshot(null, null, exception.Message);
+            return new StatusSnapshot(null, exception.Message);
         }
     }
 
@@ -624,7 +788,17 @@ public partial class DashboardViewModel : ObservableObject
 
         IReadOnlyList<PackPreview> previews = await Task.Run(() =>
         {
-            byte[]? original = _services.Previews.ReadOriginal(_installerOptions);
+            byte[]? original;
+            try
+            {
+                original = _installer.ReadOriginal(manifest, ClientFiles.IconUtx);
+            }
+            catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+            {
+                // The status already reports a damaged state.json or an unreadable file.
+                original = null;
+            }
+
             if (original is null)
             {
                 return Array.Empty<PackPreview>();
@@ -747,5 +921,8 @@ public partial class DashboardViewModel : ObservableObject
         }
     }
 
-    private sealed record StatusSnapshot(PatchFileStatus? Status, InstalledFile? Installed, string? Error);
+    private sealed record StatusSnapshot(PatchFileStatus? Status, string? Error);
+
+    /// <summary>An update the member can install now: the updater for the manifest's source and its check.</summary>
+    private sealed record PendingUpdate(UpdateService Service, UpdateCheckResult Check);
 }

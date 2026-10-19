@@ -32,6 +32,11 @@ public sealed record UpdateOptions(string ExecutablePath, LauncherVersion Curren
     /// <summary>The hand-off waits this long for the previous launcher to exit (its exe to be free).</summary>
     public RetryPolicy PreviousExitWait { get; init; } = new RetryPolicy(60, TimeSpan.FromMilliseconds(500));
 
+    /// <summary>Appended after the update option to every launcher this process starts (hand-off, restart),
+    /// so switches like the data folder survive an update. Use absolute paths: the working directory is the
+    /// exe folder. Must not contain update options.</summary>
+    public IReadOnlyList<string> ForwardedArguments { get; init; } = Array.Empty<string>();
+
     /// <summary><c>&lt;exe&gt;.new</c>: the verified download, which runs as the hand-off; after a rollback the
     /// version that was rolled back.</summary>
     public string NewPath

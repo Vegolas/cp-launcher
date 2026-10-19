@@ -68,6 +68,25 @@ public sealed record UpdateStartupInfo(
         }
     }
 
+    /// <summary>The options of this protocol; each takes a version as its value.</summary>
+    public static IReadOnlyList<string> Options
+    {
+        get
+        {
+            return new[] { UpdatedFromOption, RolledBackFromOption, InstallUpdateOption, InstallRollbackOption, UpdateFailedOption };
+        }
+    }
+
+    public static bool IsUpdateOption(string argument)
+    {
+        return Options.Contains(argument, StringComparer.Ordinal);
+    }
+
+    public static bool ContainsUpdateOption(IReadOnlyList<string> arguments)
+    {
+        return arguments.Any(IsUpdateOption);
+    }
+
     public static UpdateStartupInfo Parse(IReadOnlyList<string> arguments)
     {
         return new UpdateStartupInfo(

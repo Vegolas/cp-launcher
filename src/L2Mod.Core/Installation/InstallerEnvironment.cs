@@ -117,9 +117,33 @@ public static class GameProcesses
     }
 }
 
-/// <summary>Where the launcher keeps its data and where the client files are.</summary>
+/// <summary>
+/// Where the launcher keeps its data and where the client files are. One data folder can serve several client
+/// folders: state.json keeps a section per <see cref="ClientKey"/> and the Option.ini backup lives in a folder
+/// per <see cref="ClientId"/>; the Icon.utx backups are shared (named by the original's hash).
+/// </summary>
 public sealed record InstallerOptions(string ClientDirectory, string DataDirectory)
 {
+    /// <summary>The full client path without a trailing separator; compared without case.</summary>
+    public string ClientKey
+    {
+        get
+        {
+            return GetClientKey(ClientDirectory);
+        }
+    }
+
+    /// <summary>A short file-name-safe id of the client folder: the first 16 hex digits of the SHA-256 of
+    /// <see cref="ClientKey"/> in upper case.</summary>
+    public string ClientId
+    {
+        get
+        {
+            string hash = ContentHash.Sha256Hex(System.Text.Encoding.UTF8.GetBytes(ClientKey.ToUpperInvariant()));
+            return hash.Substring(0, 16);
+        }
+    }
+
     /// <summary>%LocalAppData%\CpLauncher</summary>
     public static string DefaultDataDirectory
     {
@@ -153,12 +177,20 @@ public sealed record InstallerOptions(string ClientDirectory, string DataDirecto
         }
     }
 
+    /// <summary>backups\clients\&lt;client id&gt;\Option.ini: the member's own settings of this client folder.
+    /// A backups\Option.ini from before the per-client folders is not adopted: it may belong to another client
+    /// folder, and restoring it would overwrite settings.</summary>
     public string OptionIniBackupPath
     {
         get
         {
-            return Path.Combine(BackupDirectory, "Option.ini");
+            return Path.Combine(BackupDirectory, "clients", ClientId, "Option.ini");
         }
+    }
+
+    public static string GetClientKey(string clientDirectory)
+    {
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(clientDirectory));
     }
 
     public string GetClientPath(string fileName)

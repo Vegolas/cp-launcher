@@ -69,6 +69,11 @@ public sealed class UpdateService
             throw new ArgumentException("Retry policies need at least one attempt.", nameof(options));
         }
 
+        if (UpdateStartupInfo.ContainsUpdateOption(options.ForwardedArguments))
+        {
+            throw new ArgumentException("Forwarded arguments must not contain update options.", nameof(options));
+        }
+
         _options = options;
         _instanceLock = instanceLock;
         _fileSystem = fileSystem;
@@ -584,7 +589,8 @@ public sealed class UpdateService
 
     private void StartLauncher(string executablePath, string option, LauncherVersion version)
     {
-        var arguments = new[] { option, version.ToString() };
+        var arguments = new List<string> { option, version.ToString() };
+        arguments.AddRange(_options.ForwardedArguments);
         _processes.Start(executablePath, arguments, _options.ExecutableDirectory);
     }
 
