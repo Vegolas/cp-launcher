@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CpLauncher\CpLauncher.csproj" />
+  </ItemGroup>
+
+  <!-- Synthetic L2-style packages and the in-memory fakes, shared with the engine tests (linked, not copied). -->
+  <ItemGroup>
+    <Compile Include="..\L2Mod.Core.Tests\Fakes.cs" Link="Shared\Fakes.cs" />
+    <Compile Include="..\L2Mod.Core.Tests\TestIcons.cs" Link="Shared\TestIcons.cs" />
+    <Compile Include="..\L2Mod.Core.Tests\TestPackageBuilder.cs" Link="Shared\TestPackageBuilder.cs" />
+  </ItemGroup>
+
+</Project>

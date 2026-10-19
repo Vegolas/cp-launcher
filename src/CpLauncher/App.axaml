@@ -1,0 +1,59 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="CpLauncher.App"
+             RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <SolidColorBrush x:Key="PageBrush" Color="#16191E" />
+    <SolidColorBrush x:Key="CardBrush" Color="#1F242B" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#2C333C" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#9AA5B4" />
+    <SolidColorBrush x:Key="InfoBrush" Color="#1E3048" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#1D4430" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#4D3B10" />
+    <SolidColorBrush x:Key="ErrorBrush" Color="#5A1F22" />
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{StaticResource CardBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <Style Selector="Border.notice">
+      <Setter Property="Background" Value="{StaticResource InfoBrush}" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style Selector="Border.notice.success">
+      <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
+    </Style>
+    <Style Selector="Border.notice.warning">
+      <Setter Property="Background" Value="{StaticResource WarningBrush}" />
+    </Style>
+    <Style Selector="Border.notice.error">
+      <Setter Property="Background" Value="{StaticResource ErrorBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.title">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.heading">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+  </Application.Styles>
+</Application>

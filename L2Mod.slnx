@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/CpLauncher/CpLauncher.csproj" />
     <Project Path="src/L2Mod.Cli/L2Mod.Cli.csproj" />
     <Project Path="src/L2Mod.Core/L2Mod.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/CpLauncher.Tests/CpLauncher.Tests.csproj" />
     <Project Path="tests/L2Mod.Core.Tests/L2Mod.Core.Tests.csproj" />
   </Folder>
 </Solution>

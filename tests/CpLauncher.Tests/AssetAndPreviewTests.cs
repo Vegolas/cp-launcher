@@ -1,0 +1,141 @@
+using CpLauncher.Services;
+using L2Mod.Core;
+using L2Mod.Core.Imaging;
+using L2Mod.Core.Installation;
+using L2Mod.Core.Manifests;
+using L2Mod.Core.Operations;
+using L2Mod.Core.Tests;
+
+namespace CpLauncher.Tests;
+
+public class AssetAndPreviewTests
+{
+    private readonly LauncherFixture _fixture = new LauncherFixture();
+    private readonly AssetCache _cache;
+    private readonly FolderManifestSource _source;
+    private readonly Manifest _manifest;
+
+    public AssetAndPreviewTests()
+    {
+        _cache = new AssetCache(_fixture.FileSystem, _fixture.Paths);
+        _source = new FolderManifestSource(_fixture.FileSystem, LauncherFixture.SourceDirectory);
+        _fixture.Publish(_fixture.Manifest());
+        _manifest = ManifestParser.Parse(TestManifests.Serialize(_fixture.Manifest())).Manifest;
+    }
+
+    [Fact]
+    public async Task EnsureAsync_DownloadsMissingOverlaysIntoTheStoreLayout()
+    {
+        IReadOnlyList<OverlayOperation> overlays = AssetCache.GetOverlays(_manifest, new[] { "marks" });
+
+        AssetSyncResult result = await _cache.EnsureAsync(overlays, _source, CancellationToken.None);
+
+        Assert.True(result.IsComplete);
+        Assert.Equal(TestManifests.OverlayPng, _cache.Store.ReadAsset(TestManifests.OverlayAssetPath));
+        Assert.Empty(AssetCache.GetOverlays(_manifest, new[] { "badges", "tags" }));
+    }
+
+    [Fact]
+    public async Task EnsureAsync_Offline_ReportsMissingImagesButUsesCachedOnes()
+    {
+        IReadOnlyList<OverlayOperation> overlays = AssetCache.GetOverlays(_manifest, new[] { "marks" });
+
+        AssetSyncResult offline = await _cache.EnsureAsync(overlays, null, CancellationToken.None);
+        await _cache.EnsureAsync(overlays, _source, CancellationToken.None);
+        AssetSyncResult cached = await _cache.EnsureAsync(overlays, null, CancellationToken.None);
+
+        Assert.Equal(new[] { TestManifests.OverlayAssetPath }, offline.Missing);
+        Assert.True(cached.IsComplete);
+    }
+
+    [Fact]
+    public async Task EnsureAsync_RejectsAnImageThatDoesNotMatchTheSignedHash()
+    {
+        _fixture.FileSystem.Seed(Path.Combine(LauncherFixture.SourceDirectory, "assets", $"{TestManifests.OverlayHash}.png"), new byte[] { 1, 2, 3 });
+        IReadOnlyList<OverlayOperation> overlays = AssetCache.GetOverlays(_manifest, new[] { "marks" });
+
+        AssetSyncResult result = await _cache.EnsureAsync(overlays, _source, CancellationToken.None);
+
+        Assert.Single(result.Errors);
+        Assert.False(_fixture.FileSystem.FileExists(_fixture.Paths.GetCachedAssetPath(TestManifests.OverlayAssetPath)));
+    }
+
+    [Fact]
+    public async Task Render_DrawsEachPackOnTheMembersOwnIconUtx()
+    {
+        await _cache.EnsureAsync(AssetCache.GetOverlays(_manifest, new[] { "marks" }), _source, CancellationToken.None);
+        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+
+        IReadOnlyList<PackPreview> previews = renderer.Render(_fixture.Original, _manifest, _cache.Store);
+
+        Assert.Equal(new[] { "badges", "tags", "marks" }, previews.Select(preview => preview.PackId));
+        Assert.All(previews, preview =>
+        {
+            Assert.Equal(0, preview.Failed);
+            Assert.Single(preview.Icons);
+        });
+        PreviewIcon tag = previews[1].Icons[0];
+        Assert.Equal("skill0102", tag.Target);
+        RgbaImage original = TestIcons.OpenDefault().Decode(TestIcons.OpenDefault().FindTexture("skill0102"));
+        Assert.NotEqual(TestIcons.Pixel(original, 1, 1), TestIcons.Pixel(tag.Image, 1, 1));
+        Assert.Equal(TestIcons.Pixel(original, 20, 20), TestIcons.Pixel(tag.Image, 20, 20));
+    }
+
+    [Fact]
+    public void Render_CountsOperationsThatCannotBeDrawn()
+    {
+        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+
+        IReadOnlyList<PackPreview> previews = renderer.Render(_fixture.Original, _manifest, _cache.Store);
+
+        Assert.Equal(1, previews[2].Failed);
+        Assert.Empty(previews[2].Icons);
+    }
+
+    [Fact]
+    public void Render_UnreadablePackage_FailsEveryPackWithoutThrowing()
+    {
+        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+
+        IReadOnlyList<PackPreview> previews = renderer.Render(new byte[] { 1, 2, 3 }, _manifest, _cache.Store);
+
+        Assert.All(previews, preview =>
+        {
+            Assert.Empty(preview.Icons);
+        });
+    }
+
+    [Fact]
+    public void ReadOriginal_PrefersTheBackupOverAPatchedClientFile()
+    {
+        var installer = new PatchInstaller(_fixture.InstallerOptions, _fixture.FileSystem, _fixture.Processes);
+        installer.Apply(_manifest, new[] { "badges" }, _cache.Store);
+        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+
+        byte[]? source = renderer.ReadOriginal(_fixture.InstallerOptions);
+
+        Assert.NotEqual(_fixture.Original, _fixture.ReadIcon());
+        Assert.Equal(_fixture.Original, source);
+    }
+
+    [Fact]
+    public void ReadOriginal_WithoutBackupOrClientFile()
+    {
+        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+
+        Assert.Equal(_fixture.Original, renderer.ReadOriginal(_fixture.InstallerOptions));
+        _fixture.FileSystem.DeleteFile(_fixture.IconPath);
+        Assert.Null(renderer.ReadOriginal(_fixture.InstallerOptions));
+    }
+
+    [Fact]
+    public void ReadOriginal_IgnoresADamagedBackup()
+    {
+        var installer = new PatchInstaller(_fixture.InstallerOptions, _fixture.FileSystem, _fixture.Processes);
+        installer.Apply(_manifest, new[] { "badges" }, _cache.Store);
+        _fixture.FileSystem.Seed(_fixture.InstallerOptions.GetBackupPath(ClientFiles.IconUtx, _fixture.OriginalHash), new byte[] { 9 });
+        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+
+        Assert.Equal(_fixture.ReadIcon(), renderer.ReadOriginal(_fixture.InstallerOptions));
+    }
+}

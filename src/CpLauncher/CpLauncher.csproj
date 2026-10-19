@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Member-facing launcher (Phase 3): UI and orchestration only, the logic lives in L2Mod.Core.
+    Ships as one trimmed single-file exe (compressed, ReadyToRun), so trim analyzers stay on.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Version>1.0.0</Version>
+    <Product>CP Launcher</Product>
+    <AssemblyTitle>CP Launcher</AssemblyTitle>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\L2Mod.Core\L2Mod.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The public half of the leader's signing key; see Services/TrustedKeys.cs. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Keys\manifest-public.pem" LogicalName="CpLauncher.Keys.manifest-public.pem" />
+  </ItemGroup>
+
+  <!-- A single-file publish ships the exe only: debug symbols (ours and the SkiaSharp/HarfBuzz native ones) stay out. -->
+  <Target Name="RemoveSymbolsFromSingleFilePublish" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+
+</Project>
