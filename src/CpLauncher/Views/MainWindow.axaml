@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:CpLauncher.ViewModels"
+        xmlns:views="clr-namespace:CpLauncher.Views"
+        x:Class="CpLauncher.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="CP Launcher"
+        Width="1080" Height="780"
+        MinWidth="860" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource PageBrush}">
+  <Window.DataTemplates>
+    <DataTemplate DataType="vm:SetupViewModel">
+      <views:SetupView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:DashboardViewModel">
+      <views:DashboardView />
+    </DataTemplate>
+  </Window.DataTemplates>
+
+  <Panel>
+    <ContentControl Content="{Binding CurrentPage}" />
+    <TextBlock Text="Wczytywanie…"
+               Classes="muted"
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               IsVisible="{Binding CurrentPage, Converter={x:Static ObjectConverters.IsNull}}" />
+  </Panel>
+</Window>
