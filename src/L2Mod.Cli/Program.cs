@@ -1,7 +1,10 @@
+using System.Security.Cryptography;
 using L2Mod.Cli;
+using L2Mod.Cli.Leader;
 using L2Mod.Core;
 using L2Mod.Core.Badges;
 using L2Mod.Core.Imaging;
+using L2Mod.Core.Manifests;
 using L2Mod.Core.Operations;
 using L2Mod.Core.Packages;
 using L2Mod.Core.Recipes;
@@ -32,6 +35,12 @@ try
             return RunReplace(CommandLine.Parse(rest, Array.Empty<string>(), new[] { "overwrite" }));
         case "badge":
             return RunBadge(CommandLine.Parse(rest, new[] { "size", "border", "border-color", "corner", "crop", "preview", "preview-scale" }, new[] { "overwrite" }));
+        case "keygen":
+        case "build":
+        case "sign":
+        case "verify":
+        case "publish":
+            return new LeaderCommands(Console.Out, Console.Error, LeaderDefaults.ForCurrentUser()).Run(args[0].ToLowerInvariant(), rest);
         default:
             PrintUsage();
             return ExitUsage;
@@ -39,7 +48,7 @@ try
 }
 catch (Exception exception) when (exception is IOException or InvalidDataException or NotSupportedException
     or KeyNotFoundException or InvalidOperationException or ArgumentException or UnauthorizedAccessException
-    or FormatException)
+    or FormatException or ManifestException or CryptographicException)
 {
     Console.Error.WriteLine($"Error: {exception.Message}");
     return ExitError;
@@ -250,6 +259,9 @@ void PrintUsage()
     Console.WriteLine("  replace <package.utx> <texture> <image.png> <output.utx> [--overwrite]");
     Console.WriteLine("  badge   <package.utx> <mapping.txt> <output.utx> [--size 16] [--border 1] [--border-color 000000] [--crop 0] [--corner br|bl|tr|tl]");
     Console.WriteLine("          [--preview sheet.png] [--preview-scale 4] [--overwrite]");
+    Console.WriteLine();
+    Console.WriteLine("CP leader: recipes -> signed dist/ for the launcher (authoring format: recipes/README.md).");
+    LeaderCommands.PrintUsage(Console.Out);
     Console.WriteLine();
     Console.WriteLine("Texture names: skill1235, skill_i.skill1235 or icon.skill1235 (as in Skillgrp.dat).");
     Console.WriteLine("badge mapping: one '<target> <badge>  # label' per line; always run it on the ORIGINAL package.");

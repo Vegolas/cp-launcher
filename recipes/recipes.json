@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "version": "2026.10.19.1",
+  "enabled": true,
+  "packs": [
+    {
+      "id": "dance-song-badges",
+      "name": "Znaczki tańców i pieśni",
+      "description": "Ikony tańców i pieśni dostają w prawym dolnym rogu miniaturę buffa o tym samym działaniu.",
+      "default": true,
+      "type": "badge",
+      "mapping": "../mappings/dances-songs.txt"
+    },
+    {
+      "id": "chant-badges",
+      "name": "Znaczki czantów i buffów Overlorda",
+      "description": "Czanty Warcryera i buffy Overlorda dostają w prawym dolnym rogu miniaturę odpowiadającego buffa Propheta.",
+      "default": true,
+      "type": "badge",
+      "mapping": "../mappings/chants.txt"
+    },
+    {
+      "id": "debuff-tags",
+      "name": "Tagi debuffów",
+      "description": "Kolorowy kwadrat w lewym górnym rogu ikony debuffu: czerwony – kontrola (stun, sen, unieruchomienie, strach, cisza), fioletowy – obrażenia w czasie, pomarańczowy – osłabienie statystyk.",
+      "default": true,
+      "type": "tag",
+      "mapping": "../mappings/debuff-tags.txt"
+    }
+  ],
+  "announcements": [],
+  "optionPresets": []
+}

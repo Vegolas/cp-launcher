@@ -1,0 +1,3 @@
+# Only the public key (signing-public.pem) belongs here. Never commit a private key.
+*private*
+*.key
