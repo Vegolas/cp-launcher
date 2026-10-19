@@ -155,6 +155,21 @@ public class OptionIniTests
     }
 
     [Fact]
+    public void Backup_BelongsToItsClientFolder()
+    {
+        var otherOptions = new InstallerOptions(@"C:\other", @"C:\data");
+        _fileSystem.Seed(otherOptions.OptionIniPath, Bytes("[Video]\r\nEffectDetail=1\r\n"));
+        var other = new OptionPresetInstaller(otherOptions, _fileSystem, _processes);
+        _installer.Apply(Preset("mass-pvp", new IniValue("Video", "EffectDetail", "0")));
+
+        Assert.False(other.HasBackup);
+        Assert.Equal(PresetOutcome.NoBackup, other.RestoreBackup().Outcome);
+        Assert.Equal("[Video]\r\nEffectDetail=1\r\n", Text(_fileSystem.ReadAllBytes(otherOptions.OptionIniPath)));
+        Assert.NotEqual(_options.OptionIniBackupPath, otherOptions.OptionIniBackupPath);
+        Assert.Equal(Path.Combine(@"C:\data\backups\clients", _options.ClientId, "Option.ini"), _options.OptionIniBackupPath);
+    }
+
+    [Fact]
     public void Apply_ReportsAMissingOptionIni()
     {
         _fileSystem.DeleteFile(_options.OptionIniPath);

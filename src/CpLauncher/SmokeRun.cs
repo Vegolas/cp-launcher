@@ -73,6 +73,50 @@ public static class SmokeRun
         return report.ToString();
     }
 
+    /// <summary>
+    /// <c>--smoke-update &lt;report&gt;</c>: reports the offered launcher update and clicks "Aktualizuj". The
+    /// report is written before the click (the process quits right after a successful start of the hand-off)
+    /// and again after it. True when the update was started and the launcher is closing.
+    /// </summary>
+    public static async Task<bool> RunUpdateAsync(MainWindowViewModel main, string reportPath)
+    {
+        var report = new StringBuilder();
+        if (main.CurrentPage is not DashboardViewModel dashboard)
+        {
+            Add(report, "page", main.CurrentPage?.GetType().Name ?? "none");
+            await File.WriteAllTextAsync(reportPath, report.ToString());
+            return false;
+        }
+
+        Add(report, "version", dashboard.LauncherVersionText);
+        Add(report, "manifest", dashboard.ManifestVersionText + " / " + dashboard.ManifestOriginText);
+        foreach (NoticeViewModel banner in dashboard.Banners)
+        {
+            Add(report, "banner", banner.Text);
+        }
+
+        Add(report, "update", dashboard.UpdateText ?? "none");
+        Add(report, "update_hint", dashboard.UpdateHint ?? "none");
+        bool canUpdate = dashboard.UpdateLauncherCommand.CanExecute(null);
+        Add(report, "update_enabled", canUpdate ? "yes" : "no");
+        foreach (string detail in dashboard.Details)
+        {
+            Add(report, "detail", detail);
+        }
+
+        await File.WriteAllTextAsync(reportPath, report.ToString());
+        if (!canUpdate)
+        {
+            return false;
+        }
+
+        // A started update shuts the launcher down right away, so this second write may not happen.
+        await dashboard.UpdateLauncherCommand.ExecuteAsync(null);
+        Add(report, "after_update", dashboard.LastAction?.Text ?? "no result");
+        await File.WriteAllTextAsync(reportPath, report.ToString());
+        return dashboard.IsBusy;
+    }
+
     /// <summary>Renders the launcher window (only it, not the screen) into a PNG next to the report.</summary>
     public static async Task CaptureAsync(Window window, string path)
     {

@@ -11,7 +11,8 @@ namespace L2Mod.Core.Updates;
 /// </summary>
 public sealed class LauncherVersion : IComparable<LauncherVersion>, IEquatable<LauncherVersion>
 {
-    private const int MaxLength = 128;
+    /// <summary>Longer text is never a version.</summary>
+    public const int MaxLength = 128;
 
     private readonly string[] _preRelease;
 

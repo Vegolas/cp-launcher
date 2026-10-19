@@ -12,6 +12,8 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- LibraryImport (source-generated P/Invoke) for the Win32 message box. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Version>1.0.0</Version>
     <Product>CP Launcher</Product>
     <AssemblyTitle>CP Launcher</AssemblyTitle>
@@ -27,6 +29,14 @@
   <ItemGroup>
     <ProjectReference Include="..\L2Mod.Core\L2Mod.Core.csproj" />
   </ItemGroup>
+
+  <!--
+    TEST BUILDS ONLY: -p:CpLauncherSimulateStartupFailure=true makes the launcher throw at startup, to check the
+    automatic rollback after an update with real processes. Normal builds do not contain that code.
+  -->
+  <PropertyGroup Condition="'$(CpLauncherSimulateStartupFailure)' == 'true'">
+    <DefineConstants>$(DefineConstants);CPLAUNCHER_SIMULATE_STARTUP_FAILURE</DefineConstants>
+  </PropertyGroup>
 
   <!-- The public half of the leader's signing key; see Services/TrustedKeys.cs. -->
   <ItemGroup>

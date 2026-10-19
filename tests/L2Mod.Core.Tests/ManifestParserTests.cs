@@ -4,6 +4,7 @@ using L2Mod.Core.Imaging;
 using L2Mod.Core.Ini;
 using L2Mod.Core.Manifests;
 using L2Mod.Core.Operations;
+using L2Mod.Core.Updates;
 
 namespace L2Mod.Core.Tests;
 
@@ -309,6 +310,135 @@ public class ManifestParserTests
         Assert.Throws<ManifestException>(() => Parse(root));
     }
 
+    [Theory]
+    [InlineData("01.0.0")]
+    [InlineData("1.00.0")]
+    [InlineData("1.0.01")]
+    [InlineData("v1.0.0")]
+    [InlineData("1.0")]
+    [InlineData("1.0.0.0")]
+    [InlineData("1.0.0-")]
+    [InlineData("1.0.0-01")]
+    [InlineData("1.0.0+")]
+    [InlineData(" 1.0.0")]
+    [InlineData("1.0.0 ")]
+    public void Parse_RejectsLauncherVersionsTheUpdaterRefuses(string version)
+    {
+        JsonObject root = Example();
+        root["launcher"]!["version"] = version;
+
+        ManifestException exception = Assert.Throws<ManifestException>(() => Parse(root));
+
+        Assert.Contains("launcher version", exception.Message);
+        Assert.False(LauncherVersion.TryParse(version, out _));
+    }
+
+    [Theory]
+    [InlineData("1.2.3")]
+    [InlineData("10.0.0")]
+    [InlineData("0.9.0")]
+    [InlineData("1.1.0-beta.1")]
+    [InlineData("1.0.1+abc123")]
+    public void Parse_AcceptsLauncherVersionsTheUpdaterAccepts(string version)
+    {
+        JsonObject root = Example();
+        root["launcher"]!["version"] = version;
+
+        Manifest manifest = Parse(root).Manifest;
+
+        Assert.Equal(version, manifest.Launcher?.Version);
+        Assert.True(LauncherVersion.TryParse(version, out _));
+    }
+
+    [Fact]
+    public void Parse_UnknownSchema_IgnoresALauncherVersionTheUpdaterRefuses()
+    {
+        JsonObject root = Example();
+        root["schema"] = 2;
+        root["launcher"]!["version"] = "01.0.0";
+
+        ManifestReadResult result = Parse(root);
+
+        Assert.Null(result.Manifest.Launcher);
+        Assert.Equal(new[] { ManifestNoteCode.UnsupportedSchema, ManifestNoteCode.LauncherIgnored }, result.Notes.Select(note => note.Code));
+    }
+
+    [Fact]
+    public void Notes_CarryCodeReasonAndThePackIdAndName()
+    {
+        JsonObject root = Example();
+        Operation(root, 0)["op"] = "recolor";
+        Operation(root, 1)["edge"] = 1;
+        Operation(root, 2)["file"] = "Icon_c.utx";
+
+        ManifestReadResult result = Parse(root);
+
+        Assert.Empty(result.Manifest.Packs);
+        Assert.Equal(
+            new (ManifestNoteCode, ManifestSkipReason, string?, string?)[]
+            {
+                (ManifestNoteCode.PackSkipped, ManifestSkipReason.UnknownOperation, "dance-song-badges", "Znaczki tańców i pieśni"),
+                (ManifestNoteCode.PackSkipped, ManifestSkipReason.UnknownField, "debuff-tags", "Tagi debuffów"),
+                (ManifestNoteCode.PackSkipped, ManifestSkipReason.FileNotAllowed, "item-marks", "Oznaczenia przedmiotów"),
+            },
+            result.Notes.Select(note => (note.Code, note.Reason, note.ItemId, note.ItemName)));
+        Assert.Equal(result.Notes.Select(note => note.Message), result.Messages);
+        Assert.Contains("unknown op 'recolor'", result.Notes[0].Message);
+    }
+
+    [Fact]
+    public void Notes_TellLimitsDuplicatesAndBadValuesApart()
+    {
+        JsonObject root = Example();
+        Operation(root, 0)["size"] = 18;
+        JsonArray operations = Operations(root, 1);
+        operations.Add(operations[0]!.DeepClone());
+
+        ManifestReadResult result = Parse(root, ManifestLimits.Default with { MaxOperationsPerPack = 1 });
+
+        Assert.Equal(new[] { ManifestSkipReason.InvalidValue, ManifestSkipReason.OverLimit }, result.Notes.Select(note => note.Reason));
+        Assert.Equal(new[] { ManifestSkipReason.DuplicateId }, Parse(DuplicatePackIds()).Notes.Select(note => note.Reason));
+        Assert.Equal(
+            new[] { ManifestNoteCode.PackLimit },
+            Parse(Example(), ManifestLimits.Default with { MaxPacks = 2 }).Notes.Select(note => note.Code));
+    }
+
+    [Fact]
+    public void Notes_ForPresetsAnnouncementsAndOriginals()
+    {
+        JsonObject root = Example();
+        PresetValues(root)["Video"]!["GamePlayViewportX"] = "1";
+        root["announcements"]![0]!["date"] = "20.10.2026";
+        root["supportedOriginals"]!["L2.ini"] = new JsonArray();
+
+        ManifestReadResult result = Parse(root);
+
+        Assert.Equal(
+            new (ManifestNoteCode, ManifestSkipReason, string?, string?)[]
+            {
+                (ManifestNoteCode.OriginalIgnored, ManifestSkipReason.None, null, null),
+                (ManifestNoteCode.AnnouncementSkipped, ManifestSkipReason.InvalidValue, null, "Start"),
+                (ManifestNoteCode.PresetSkipped, ManifestSkipReason.ForbiddenKey, "mass-pvp", "Masowe PvP"),
+            },
+            result.Notes.Select(note => (note.Code, note.Reason, note.ItemId, note.ItemName)));
+    }
+
+    [Fact]
+    public void Notes_ItemTextIsShortenedAndHasNoControlCharacters()
+    {
+        JsonObject root = Example();
+        Operation(root, 0)["op"] = "recolor";
+        Pack(root, 0)["name"] = "Zła\nnazwa" + new string('x', 100);
+        Pack(root, 0).Remove("id");
+
+        ManifestNote note = Parse(root).Notes.Single();
+
+        Assert.Null(note.ItemId);
+        Assert.StartsWith("Zła nazwa", note.ItemName);
+        Assert.EndsWith("...", note.ItemName);
+        Assert.Equal(67, note.ItemName!.Length);
+    }
+
     [Fact]
     public void Parse_RejectsInvalidJsonDuplicatePropertiesAndOversizedManifests()
     {
@@ -330,6 +460,13 @@ public class ManifestParserTests
     private static JsonObject Example()
     {
         return JsonNode.Parse(ExampleJson)!.AsObject();
+    }
+
+    private static JsonObject DuplicatePackIds()
+    {
+        JsonObject root = Example();
+        Pack(root, 2)["id"] = "debuff-tags";
+        return root;
     }
 
     private static ManifestReadResult Parse(JsonObject root, ManifestLimits? limits = null)

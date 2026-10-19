@@ -13,8 +13,18 @@ public enum ManifestOrigin
     Cache,
 }
 
-/// <summary>A verified manifest. <see cref="Messages"/> are the parser's notes (skipped packs and presets).</summary>
-public sealed record LoadedManifest(Manifest Manifest, IReadOnlyList<string> Messages, ManifestOrigin Origin, TrustedKey Key);
+/// <summary>A verified manifest. <see cref="Notes"/> are the parser's notes (skipped packs and presets).</summary>
+public sealed record LoadedManifest(Manifest Manifest, IReadOnlyList<ManifestNote> Notes, ManifestOrigin Origin, TrustedKey Key)
+{
+    /// <summary>The English texts of <see cref="Notes"/>.</summary>
+    public IReadOnlyList<string> Messages
+    {
+        get
+        {
+            return Notes.Select(note => note.Message).ToList();
+        }
+    }
+}
 
 /// <summary>
 /// <see cref="Manifest"/> is null when neither the source nor the cache gave a usable manifest.
@@ -129,7 +139,7 @@ public sealed class ManifestService
                 throw new ManifestException($"Manifest ma poprawny podpis, ale nie da się go odczytać: {exception.Message}", exception);
             }
 
-            return new LoadedManifest(result.Manifest, result.Messages, origin, key);
+            return new LoadedManifest(result.Manifest, result.Notes, origin, key);
         }
 
         throw new ManifestException("Manifest ma nieprawidłowy podpis – nie pochodzi od lidera CP albo został zmieniony. Używam ostatniego sprawdzonego.");

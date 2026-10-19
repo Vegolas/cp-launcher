@@ -7,10 +7,13 @@
 // Everything goes under <out>, which must be inside a work\ folder (gitignored, where copies of game files live)
 // and must not be a real client folder.
 //
-//   dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir>      (from the repository root)
+//   dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir> [--launcher <version> <exe>]   (from the repository root)
+//
+// --launcher offers <exe> as launcher <version> (copied to source\launcher\, hashed into the manifest), for
+// checking the self-update; serve the source over http://127.0.0.1 then, folders cannot deliver updates.
 //
 // Result:
-//   <out>\source\  manifest.json, manifest.json.sig, dev-public.pem, assets\<sha256>.png
+//   <out>\source\  manifest.json, manifest.json.sig, dev-public.pem, assets\<sha256>.png[, launcher\CpLauncher-<version>.exe]
 //   <out>\client\  SysTextures\Icon.utx (copy), system_season\L2.exe (dummy), system_season\Option.ini, FAKE-CLIENT.txt
 //
 // Start the launcher against it:
@@ -26,17 +29,32 @@ using L2Mod.Core.Operations;
 using L2Mod.Core.Packages;
 using L2Mod.Core.Recipes;
 using L2Mod.Core.Signing;
+using L2Mod.Core.Updates;
 
 const string FakeMarker = "FAKE-CLIENT.txt";
 
-if (args.Length != 2)
+bool withLauncher = args.Length == 5 && args[2] == "--launcher";
+if (args.Length != 2 && !withLauncher)
 {
-    Console.Error.WriteLine("usage: dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir>");
+    Console.Error.WriteLine("usage: dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir> [--launcher <version> <exe>]");
     return 1;
 }
 
 string iconPath = Path.GetFullPath(args[0]);
 string outDirectory = Path.GetFullPath(args[1]);
+LauncherRelease? launcher = null;
+byte[]? launcherBytes = null;
+if (withLauncher)
+{
+    if (!LauncherVersion.TryParse(args[3], out LauncherVersion? launcherVersion))
+    {
+        Console.Error.WriteLine($"'{args[3]}' is not a launcher version like 1.0.1.");
+        return 1;
+    }
+
+    launcherBytes = File.ReadAllBytes(Path.GetFullPath(args[4]));
+    launcher = new LauncherRelease(launcherVersion.ToString(), $"launcher/CpLauncher-{launcherVersion}.exe", ContentHash.Sha256Hex(launcherBytes));
+}
 string mappings = Path.Combine(Directory.GetCurrentDirectory(), "mappings");
 if (!Directory.Exists(mappings))
 {
@@ -83,7 +101,7 @@ var all = packs.SelectMany(pack => pack.Operations).ToList();
 OperationBuildResult build = OperationComposer.Build(package, all, assets);
 Console.WriteLine($"{all.Count} operations build on {Path.GetFileName(iconPath)} ({build.Warnings.Count} warnings).");
 
-byte[] manifest = WriteManifest(originalHash, packs);
+byte[] manifest = WriteManifest(originalHash, packs, launcher);
 ManifestReadResult parsed = ManifestParser.Parse(manifest);
 if (parsed.Messages.Count > 0 || parsed.Manifest.Packs.Count != packs.Count)
 {
@@ -100,6 +118,12 @@ File.WriteAllBytes(Path.Combine(sourceDirectory, "manifest.json"), manifest);
 File.WriteAllBytes(Path.Combine(sourceDirectory, "manifest.json.sig"), signature);
 File.WriteAllText(Path.Combine(sourceDirectory, "dev-public.pem"), key.PublicKeyPem);
 File.WriteAllBytes(Path.Combine(sourceDirectory, markPath.Replace('/', Path.DirectorySeparatorChar)), markPng);
+if (launcher is not null)
+{
+    Directory.CreateDirectory(Path.Combine(sourceDirectory, "launcher"));
+    File.WriteAllBytes(Path.Combine(sourceDirectory, launcher.Url.Replace('/', Path.DirectorySeparatorChar)), launcherBytes!);
+    Console.WriteLine($"Launcher release: {launcher.Version} ({launcherBytes!.Length} bytes, SHA-256 {launcher.Sha256})");
+}
 
 Directory.CreateDirectory(Path.Combine(clientDirectory, "SysTextures"));
 Directory.CreateDirectory(Path.Combine(clientDirectory, "system_season"));
@@ -156,7 +180,7 @@ static RgbaImage DrawMark()
     return image;
 }
 
-static byte[] WriteManifest(string originalHash, IReadOnlyList<(string Id, string Name, bool Default, IReadOnlyList<IIconOperation> Operations)> packs)
+static byte[] WriteManifest(string originalHash, IReadOnlyList<(string Id, string Name, bool Default, IReadOnlyList<IIconOperation> Operations)> packs, LauncherRelease? launcher)
 {
     using var stream = new MemoryStream();
     var options = new JsonWriterOptions { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -166,11 +190,14 @@ static byte[] WriteManifest(string originalHash, IReadOnlyList<(string Id, strin
         writer.WriteNumber("schema", 1);
         writer.WriteString("version", DateTime.Now.ToString("yyyy.MM.dd.HHmm"));
         writer.WriteBoolean("enabled", true);
-        writer.WriteStartObject("launcher");
-        writer.WriteString("version", "1.0.1");
-        writer.WriteString("url", "launcher/CpLauncher-1.0.1.exe");
-        writer.WriteString("sha256", new string('0', 64));
-        writer.WriteEndObject();
+        if (launcher is not null)
+        {
+            writer.WriteStartObject("launcher");
+            writer.WriteString("version", launcher.Version);
+            writer.WriteString("url", launcher.Url);
+            writer.WriteString("sha256", launcher.Sha256);
+            writer.WriteEndObject();
+        }
         writer.WriteStartObject("supportedOriginals");
         writer.WriteStartArray(ClientFiles.IconUtx);
         writer.WriteStringValue(originalHash);

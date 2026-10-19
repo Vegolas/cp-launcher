@@ -83,6 +83,15 @@ public sealed class HttpManifestSource : IManifestSource
         }
     }
 
+    /// <summary>The folder of manifest.json, with a trailing slash.</summary>
+    public Uri BaseUri
+    {
+        get
+        {
+            return _baseUri;
+        }
+    }
+
     public async Task<byte[]> ReadAsync(string relativePath, int maxBytes, CancellationToken cancellationToken)
     {
         DistributionPaths.Require(relativePath);
@@ -268,7 +277,7 @@ public sealed class ManifestSourceFactory
         {
             Timeout = TimeSpan.FromSeconds(20),
         };
-        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("CpLauncher", LauncherVersion.Current.ToString(3)));
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("CpLauncher", LauncherBuild.CurrentVersion.ToString()));
         return client;
     }
 }

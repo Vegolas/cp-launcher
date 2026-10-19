@@ -142,6 +142,60 @@ public class SettingsTests
     }
 
     [Fact]
+    public void CommandLine_SkipsUpdateOptionsAndForwardsDataAndDevelopmentKey()
+    {
+        CommandLineOptions options = CommandLineOptions.Parse(new[]
+        {
+            "--updated-from", "1.0.0", "--data", @"C:\d", "--dev-public-key", @"C:\k\dev.pem", "--source", "https://x/", "--smoke-update", @"C:\r.txt",
+        });
+
+        Assert.Empty(options.Problems);
+        Assert.Equal(@"C:\r.txt", options.SmokeUpdateReportPath);
+        Assert.Equal(new[] { "--data", @"C:\d", "--dev-public-key", @"C:\k\dev.pem" }, options.ForwardedArguments);
+        Assert.Equal(new[] { "--data", Path.GetFullPath("relative-data") }, CommandLineOptions.Parse(new[] { "--data", "relative-data" }).ForwardedArguments);
+        Assert.Empty(CommandLineOptions.Parse(new[] { "--source", "https://x/", "--smoke", "r.txt" }).ForwardedArguments);
+    }
+
+    [Fact]
+    public void SkippedLauncherVersion_RoundTripsAndIgnoresGarbage()
+    {
+        var fixture = new LauncherFixture();
+        var store = new SettingsStore(fixture.FileSystem, fixture.Paths.SettingsPath);
+
+        store.Save(LauncherSettings.Default with { SkippedLauncherVersion = "1.0.1" });
+
+        Assert.Equal(L2Mod.Core.Updates.LauncherVersion.Parse("1.0.1"), store.Load().Settings.SkippedVersion);
+        Assert.Null((LauncherSettings.Default with { SkippedLauncherVersion = "01.0.1" }).SkippedVersion);
+        Assert.Null(LauncherSettings.Default.SkippedVersion);
+    }
+
+    [Fact]
+    public void Log_AppendsLinesAndStartsANewFileAboveTheLimit()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "cplauncher-log-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var log = new LauncherLog(Path.Combine(directory, "launcher.log"));
+            log.Write("first");
+            File.AppendAllText(log.Path!, new string('x', (int)LauncherLog.MaxBytes));
+            log.Write("second");
+            LauncherLog.None.Write("nowhere");
+
+            Assert.Contains("first", File.ReadAllText(log.Path! + ".1"));
+            string current = File.ReadAllText(log.Path!);
+            Assert.Contains($"[{Environment.ProcessId}] second", current);
+            Assert.DoesNotContain("first", current);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+    }
+
+    [Fact]
     public void Bootstrap_AppliesOverridesAndTrustsTheDevelopmentKey()
     {
         var fixture = new LauncherFixture();
@@ -151,7 +205,7 @@ public class SettingsTests
             "--data", @"C:\data", "--client", @"C:\client", "--source", @"C:\source", "--dev-public-key", @"C:\keys\dev.pem",
         });
 
-        LauncherStartup startup = LauncherBootstrap.Create(options, fixture.FileSystem, fixture.Processes, fixture.Game, fixture.Dialogs, null);
+        LauncherStartup startup = LauncherBootstrap.Create(options, fixture.FileSystem, fixture.Processes, fixture.Game, fixture.Dialogs, null, fixture.CreateHost());
 
         Assert.Empty(startup.Notes);
         Assert.Equal(@"C:\client", startup.Services.Settings.Current.ClientDirectory);
@@ -169,7 +223,7 @@ public class SettingsTests
         fixture.FileSystem.Seed(@"C:\keys\dev.pem", Encoding.UTF8.GetBytes("not a key"));
         CommandLineOptions options = CommandLineOptions.Parse(new[] { "--data", @"C:\data", "--dev-public-key", @"C:\keys\dev.pem" });
 
-        LauncherStartup startup = LauncherBootstrap.Create(options, fixture.FileSystem, fixture.Processes, fixture.Game, fixture.Dialogs, null);
+        LauncherStartup startup = LauncherBootstrap.Create(options, fixture.FileSystem, fixture.Processes, fixture.Game, fixture.Dialogs, null, fixture.CreateHost());
 
         Assert.Single(startup.Services.TrustedKeys);
         Assert.Contains(startup.Notes, note => note.Contains("dev.pem"));

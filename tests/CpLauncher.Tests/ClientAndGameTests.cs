@@ -1,6 +1,7 @@
 using CpLauncher.Services;
 using L2Mod.Core.Signing;
 using L2Mod.Core.Tests;
+using L2Mod.Core.Updates;
 
 namespace CpLauncher.Tests;
 
@@ -78,23 +79,10 @@ public class ClientAndGameTests
         Assert.Equal("L2Updater.exe", GameExecutables.Default);
     }
 
-    [Theory]
-    [InlineData("1.0.1", true)]
-    [InlineData("1.1.0", true)]
-    [InlineData("2.0.0", true)]
-    [InlineData("1.0.0", false)]
-    [InlineData("0.9.9", false)]
-    [InlineData("garbage", false)]
-    [InlineData(null, false)]
-    public void LauncherVersion_DetectsNewerReleases(string? candidate, bool newer)
-    {
-        Assert.Equal(newer, LauncherVersion.IsNewer(candidate, new Version(1, 0, 0)));
-    }
-
     [Fact]
-    public void LauncherVersion_IsTheProjectVersion()
+    public void LauncherBuild_IsTheProjectVersion()
     {
-        Assert.Equal(new Version(1, 0, 0), LauncherVersion.Current);
+        Assert.Equal(LauncherVersion.Parse("1.0.0"), LauncherBuild.CurrentVersion);
     }
 
     [Fact]

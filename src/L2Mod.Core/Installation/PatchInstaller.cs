@@ -35,13 +35,68 @@ public enum PendingAction
     Restore,
 }
 
+/// <summary>
+/// Why a file has its <see cref="PatchFileState"/> and <see cref="PendingAction"/>, or why an apply or restore
+/// ended with its <see cref="PatchOutcome"/>, so a UI can describe it without deriving it again.
+/// </summary>
+public enum PatchReason
+{
+    /// <summary>Not set: the record was not made by <see cref="PatchInstaller"/>.</summary>
+    Unspecified,
+
+    /// <summary>The file does not exist in the client folder.</summary>
+    FileMissing,
+
+    /// <summary>Neither a supported original nor our last patch: left alone.</summary>
+    UnknownVersion,
+
+    /// <summary>The manifest's kill switch is off: nothing is installed, our patch is restored.</summary>
+    SwitchedOff,
+
+    /// <summary>The manifest has a newer schema: nothing is installed or rebuilt until the launcher is updated.</summary>
+    NeedsNewerLauncher,
+
+    /// <summary>No selected pack changes the file: nothing is installed, our patch is restored.</summary>
+    NothingSelected,
+
+    /// <summary>A supported original; the selected packs are not installed yet.</summary>
+    NotInstalled,
+
+    /// <summary>Our patch matches the selected packs and the recipes.</summary>
+    UpToDate,
+
+    /// <summary>Our patch, but the recipes or the selected packs changed: rebuilt from the backup.</summary>
+    Outdated,
+
+    /// <summary>Our patch was built from an original the manifest no longer supports: left as it is.</summary>
+    UnsupportedOriginal,
+
+    /// <summary>Restore: there is no backup of the original.</summary>
+    NoBackup,
+
+    /// <summary>Restore: the file already is the original.</summary>
+    AlreadyOriginal,
+
+    /// <summary>Restore: the original was put back on request.</summary>
+    RestoreRequested,
+
+    /// <summary>The game is running; nothing was changed.</summary>
+    GameRunning,
+
+    /// <summary>A file or data error; see the message.</summary>
+    Error,
+}
+
 public sealed record PatchFileStatus(
     string FileName,
     PatchFileState State,
     string? CurrentSha256,
     bool HasBackup,
     PendingAction Pending,
-    string Message);
+    string Message)
+{
+    public PatchReason Reason { get; init; }
+}
 
 public enum PatchOutcome
 {
@@ -58,7 +113,10 @@ public enum PatchOutcome
     Failed,
 }
 
-public sealed record PatchFileResult(string FileName, PatchOutcome Outcome, string Message, IReadOnlyList<string> Warnings);
+public sealed record PatchFileResult(string FileName, PatchOutcome Outcome, string Message, IReadOnlyList<string> Warnings)
+{
+    public PatchReason Reason { get; init; }
+}
 
 /// <summary>
 /// Installs patches built from the manifest onto the whitelisted client files, one state machine per file:
@@ -85,7 +143,7 @@ public sealed class PatchInstaller
         _options = options;
         _fileSystem = fileSystem;
         _processes = processes;
-        _store = new InstallStateStore(fileSystem, options.StatePath);
+        _store = new InstallStateStore(fileSystem, options.StatePath, options.ClientDirectory);
     }
 
     /// <summary>Identifies a set of operations (order matters) together with the engine version.</summary>
@@ -132,11 +190,50 @@ public sealed class PatchInstaller
             }
             catch (Exception exception) when (IsExpectedFailure(exception))
             {
-                results.Add(new PatchFileResult(fileName, PatchOutcome.Failed, exception.Message, Array.Empty<string>()));
+                results.Add(Failed(fileName, exception));
             }
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// The original of a client file, to draw previews on: the client file when the manifest supports it as an
+    /// original, otherwise the verified backup of the original our patch was built from. Null when neither is
+    /// there: drawing on our patch or on an unknown version would show wrong (stacked) icons.
+    /// Throws <see cref="InvalidDataException"/> when state.json is damaged.
+    /// </summary>
+    public byte[]? ReadOriginal(Manifest manifest, string fileName)
+    {
+        string path = _options.GetClientPath(fileName);
+        if (_fileSystem.FileExists(path))
+        {
+            byte[] current = _fileSystem.ReadAllBytes(path);
+            if (manifest.IsSupportedOriginal(fileName, ContentHash.Sha256Hex(current)))
+            {
+                return current;
+            }
+        }
+
+        InstalledFile? installed = _store.Load().Get(fileName);
+        if (installed is null)
+        {
+            return null;
+        }
+
+        string backupPath = _options.GetBackupPath(fileName, installed.OriginalSha256);
+        if (!_fileSystem.FileExists(backupPath))
+        {
+            return null;
+        }
+
+        byte[] backup = _fileSystem.ReadAllBytes(backupPath);
+        if (!ContentHash.Matches(installed.OriginalSha256, backup))
+        {
+            return null;
+        }
+
+        return backup;
     }
 
     /// <summary>"Restore original": puts the backed-up original back wherever the file differs from it.</summary>
@@ -157,7 +254,7 @@ public sealed class PatchInstaller
             }
             catch (Exception exception) when (IsExpectedFailure(exception))
             {
-                results.Add(new PatchFileResult(fileName, PatchOutcome.Failed, exception.Message, Array.Empty<string>()));
+                results.Add(Failed(fileName, exception));
             }
         }
 
@@ -171,7 +268,10 @@ public sealed class PatchInstaller
         string path = _options.GetClientPath(fileName);
         if (!_fileSystem.FileExists(path))
         {
-            var missing = new PatchFileStatus(fileName, PatchFileState.Missing, null, hasBackup, PendingAction.None, $"{ClientFiles.GetRelativePath(fileName)} was not found in the client folder.");
+            var missing = new PatchFileStatus(fileName, PatchFileState.Missing, null, hasBackup, PendingAction.None, $"{ClientFiles.GetRelativePath(fileName)} was not found in the client folder.")
+            {
+                Reason = PatchReason.FileMissing,
+            };
             return new Inspection(missing, null, Array.Empty<IIconOperation>(), string.Empty, installed);
         }
 
@@ -186,44 +286,49 @@ public sealed class PatchInstaller
 
         string recipeKey = ComputeRecipeKey(operations);
         PatchFileState fileState;
-        PendingAction pending;
-        string message;
+        Plan plan;
         if (manifest.IsSupportedOriginal(fileName, hash))
         {
             fileState = PatchFileState.Original;
-            pending = PendingAction.None;
-            message = $"{fileName} is the original; nothing to install.";
+            plan = new Plan(PendingAction.None, PatchReason.NothingSelected, $"{fileName} is the original; nothing to install.");
             if (!manifest.Enabled)
             {
-                message = $"{fileName} is the original; patches are switched off in the manifest.";
+                plan = new Plan(PendingAction.None, PatchReason.SwitchedOff, $"{fileName} is the original; patches are switched off in the manifest.");
+            }
+            else if (!readable)
+            {
+                plan = new Plan(PendingAction.None, PatchReason.NeedsNewerLauncher, $"{fileName} is the original; nothing to install.");
             }
             else if (operations.Count > 0)
             {
-                pending = PendingAction.Install;
-                message = $"{fileName} is the original; the selected packs are not installed yet.";
+                plan = new Plan(PendingAction.Install, PatchReason.NotInstalled, $"{fileName} is the original; the selected packs are not installed yet.");
             }
         }
         else if (installed?.PatchedSha256 is not null && string.Equals(installed.PatchedSha256, hash, StringComparison.OrdinalIgnoreCase))
         {
             fileState = PatchFileState.OurPatch;
-            (pending, message) = PlanForOurPatch(fileName, manifest, readable, operations, recipeKey, installed);
+            plan = PlanForOurPatch(fileName, manifest, readable, operations, recipeKey, installed);
         }
         else
         {
             fileState = PatchFileState.Unknown;
-            pending = PendingAction.None;
-            message = $"Unknown version of {fileName}; waiting for a recipe update.";
+            string message = $"Unknown version of {fileName}; waiting for a recipe update.";
             if (hasBackup)
             {
                 message += " The backed-up original can be restored.";
             }
+
+            plan = new Plan(PendingAction.None, PatchReason.UnknownVersion, message);
         }
 
-        var status = new PatchFileStatus(fileName, fileState, hash, hasBackup, pending, message);
+        var status = new PatchFileStatus(fileName, fileState, hash, hasBackup, plan.Pending, plan.Message)
+        {
+            Reason = plan.Reason,
+        };
         return new Inspection(status, current, operations, recipeKey, installed);
     }
 
-    private (PendingAction Pending, string Message) PlanForOurPatch(
+    private static Plan PlanForOurPatch(
         string fileName,
         Manifest manifest,
         bool readable,
@@ -233,30 +338,30 @@ public sealed class PatchInstaller
     {
         if (!manifest.Enabled)
         {
-            return (PendingAction.Restore, $"Patches are switched off in the manifest; the original {fileName} will be restored.");
+            return new Plan(PendingAction.Restore, PatchReason.SwitchedOff, $"Patches are switched off in the manifest; the original {fileName} will be restored.");
         }
 
         if (!readable)
         {
-            return (PendingAction.None, $"Our patch of {fileName} stays as it is until the launcher is updated.");
+            return new Plan(PendingAction.None, PatchReason.NeedsNewerLauncher, $"Our patch of {fileName} stays as it is until the launcher is updated.");
         }
 
         if (operations.Count == 0)
         {
-            return (PendingAction.Restore, $"No selected pack changes {fileName}; the original will be restored.");
+            return new Plan(PendingAction.Restore, PatchReason.NothingSelected, $"No selected pack changes {fileName}; the original will be restored.");
         }
 
         if (string.Equals(installed.RecipeKey, recipeKey, StringComparison.Ordinal))
         {
-            return (PendingAction.None, $"Our patch of {fileName} is up to date.");
+            return new Plan(PendingAction.None, PatchReason.UpToDate, $"Our patch of {fileName} is up to date.");
         }
 
         if (!manifest.IsSupportedOriginal(fileName, installed.OriginalSha256))
         {
-            return (PendingAction.None, $"Our patch of {fileName} was built from an original this manifest no longer supports; restore it or wait for a recipe update.");
+            return new Plan(PendingAction.None, PatchReason.UnsupportedOriginal, $"Our patch of {fileName} was built from an original this manifest no longer supports; restore it or wait for a recipe update.");
         }
 
-        return (PendingAction.Rebuild, $"Recipes or selected packs changed; {fileName} will be rebuilt from the original.");
+        return new Plan(PendingAction.Rebuild, PatchReason.Outdated, $"Recipes or selected packs changed; {fileName} will be rebuilt from the original.");
     }
 
     private PatchFileResult Execute(Inspection inspection, InstallState state, IAssetStore assets)
@@ -272,7 +377,7 @@ public sealed class PatchInstaller
                 EnsureBackup(fileName, original, originalHash);
                 (byte[] patched, IReadOnlyList<string> warnings) = BuildPatch(fileName, original, inspection.Operations, assets);
                 Install(fileName, patched, originalHash, inspection.RecipeKey, state);
-                return new PatchFileResult(fileName, PatchOutcome.Installed, $"Patch of {fileName} installed ({inspection.Operations.Count} operations).", warnings);
+                return Result(fileName, PatchOutcome.Installed, status.Reason, $"Patch of {fileName} installed ({inspection.Operations.Count} operations).", warnings);
             }
 
             case PendingAction.Rebuild:
@@ -284,17 +389,17 @@ public sealed class PatchInstaller
                 {
                     state.Files[fileName] = inspection.Installed with { RecipeKey = inspection.RecipeKey };
                     _store.Save(state);
-                    return new PatchFileResult(fileName, PatchOutcome.Unchanged, $"Our patch of {fileName} already matches the recipes.", warnings);
+                    return Result(fileName, PatchOutcome.Unchanged, PatchReason.UpToDate, $"Our patch of {fileName} already matches the recipes.", warnings);
                 }
 
                 Install(fileName, patched, originalHash, inspection.RecipeKey, state);
-                return new PatchFileResult(fileName, PatchOutcome.Rebuilt, $"Patch of {fileName} rebuilt ({inspection.Operations.Count} operations).", warnings);
+                return Result(fileName, PatchOutcome.Rebuilt, status.Reason, $"Patch of {fileName} rebuilt ({inspection.Operations.Count} operations).", warnings);
             }
 
             case PendingAction.Restore:
             {
                 RestoreBackup(fileName, inspection.Installed!, state);
-                return new PatchFileResult(fileName, PatchOutcome.Restored, status.Message, Array.Empty<string>());
+                return Result(fileName, PatchOutcome.Restored, status.Reason, status.Message, Array.Empty<string>());
             }
 
             default:
@@ -305,7 +410,7 @@ public sealed class PatchInstaller
                     outcome = PatchOutcome.Skipped;
                 }
 
-                return new PatchFileResult(fileName, outcome, status.Message, Array.Empty<string>());
+                return Result(fileName, outcome, status.Reason, status.Message, Array.Empty<string>());
             }
         }
     }
@@ -316,17 +421,17 @@ public sealed class PatchInstaller
         InstalledFile? installed = state.Get(fileName);
         if (installed is null || !_fileSystem.FileExists(_options.GetBackupPath(fileName, installed.OriginalSha256)))
         {
-            return new PatchFileResult(fileName, PatchOutcome.Skipped, $"There is no backup of the original {fileName}.", Array.Empty<string>());
+            return Result(fileName, PatchOutcome.Skipped, PatchReason.NoBackup, $"There is no backup of the original {fileName}.", Array.Empty<string>());
         }
 
         string path = _options.GetClientPath(fileName);
         if (_fileSystem.FileExists(path) && ContentHash.Matches(installed.OriginalSha256, _fileSystem.ReadAllBytes(path)))
         {
-            return new PatchFileResult(fileName, PatchOutcome.Unchanged, $"{fileName} already is the original.", Array.Empty<string>());
+            return Result(fileName, PatchOutcome.Unchanged, PatchReason.AlreadyOriginal, $"{fileName} already is the original.", Array.Empty<string>());
         }
 
         RestoreBackup(fileName, installed, state);
-        return new PatchFileResult(fileName, PatchOutcome.Restored, $"Original {fileName} restored.", Array.Empty<string>());
+        return Result(fileName, PatchOutcome.Restored, PatchReason.RestoreRequested, $"Original {fileName} restored.", Array.Empty<string>());
     }
 
     private (byte[] Bytes, IReadOnlyList<string> Warnings) BuildPatch(string fileName, byte[] original, IReadOnlyList<IIconOperation> operations, IAssetStore assets)
@@ -384,10 +489,23 @@ public sealed class PatchInstaller
         var results = new List<PatchFileResult>();
         foreach (string fileName in ClientFiles.Patchable)
         {
-            results.Add(new PatchFileResult(fileName, PatchOutcome.Blocked, message, Array.Empty<string>()));
+            results.Add(Result(fileName, PatchOutcome.Blocked, PatchReason.GameRunning, message, Array.Empty<string>()));
         }
 
         return results;
+    }
+
+    private static PatchFileResult Result(string fileName, PatchOutcome outcome, PatchReason reason, string message, IReadOnlyList<string> warnings)
+    {
+        return new PatchFileResult(fileName, outcome, message, warnings)
+        {
+            Reason = reason,
+        };
+    }
+
+    private static PatchFileResult Failed(string fileName, Exception exception)
+    {
+        return Result(fileName, PatchOutcome.Failed, PatchReason.Error, exception.Message, Array.Empty<string>());
     }
 
     private static bool IsExpectedFailure(Exception exception)
@@ -395,6 +513,8 @@ public sealed class PatchInstaller
         return exception is IOException or InvalidDataException or NotSupportedException or KeyNotFoundException
             or InvalidOperationException or ArgumentException or UnauthorizedAccessException or FormatException;
     }
+
+    private sealed record Plan(PendingAction Pending, PatchReason Reason, string Message);
 
     private sealed record Inspection(
         PatchFileStatus Status,

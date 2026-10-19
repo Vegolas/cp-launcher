@@ -64,7 +64,7 @@ public class AssetAndPreviewTests
     public async Task Render_DrawsEachPackOnTheMembersOwnIconUtx()
     {
         await _cache.EnsureAsync(AssetCache.GetOverlays(_manifest, new[] { "marks" }), _source, CancellationToken.None);
-        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+        var renderer = new PackPreviewRenderer();
 
         IReadOnlyList<PackPreview> previews = renderer.Render(_fixture.Original, _manifest, _cache.Store);
 
@@ -84,7 +84,7 @@ public class AssetAndPreviewTests
     [Fact]
     public void Render_CountsOperationsThatCannotBeDrawn()
     {
-        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+        var renderer = new PackPreviewRenderer();
 
         IReadOnlyList<PackPreview> previews = renderer.Render(_fixture.Original, _manifest, _cache.Store);
 
@@ -95,7 +95,7 @@ public class AssetAndPreviewTests
     [Fact]
     public void Render_UnreadablePackage_FailsEveryPackWithoutThrowing()
     {
-        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+        var renderer = new PackPreviewRenderer();
 
         IReadOnlyList<PackPreview> previews = renderer.Render(new byte[] { 1, 2, 3 }, _manifest, _cache.Store);
 
@@ -106,36 +106,36 @@ public class AssetAndPreviewTests
     }
 
     [Fact]
-    public void ReadOriginal_PrefersTheBackupOverAPatchedClientFile()
+    public async Task Previews_AreDrawnOnTheBackedUpOriginalWhileOurPatchIsInstalled()
     {
-        var installer = new PatchInstaller(_fixture.InstallerOptions, _fixture.FileSystem, _fixture.Processes);
-        installer.Apply(_manifest, new[] { "badges" }, _cache.Store);
-        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
+        CpLauncher.ViewModels.DashboardViewModel dashboard = await _fixture.CreateDashboardAsync();
+        RgbaImage before = dashboard.Packs[1].Thumbnails[0].Image;
+        await dashboard.ApplyCommand.ExecuteAsync(null);
 
-        byte[]? source = renderer.ReadOriginal(_fixture.InstallerOptions);
+        await dashboard.RefreshCommand.ExecuteAsync(null);
 
         Assert.NotEqual(_fixture.Original, _fixture.ReadIcon());
-        Assert.Equal(_fixture.Original, source);
+        Assert.Equal(before.Pixels, dashboard.Packs[1].Thumbnails[0].Image.Pixels);
     }
 
     [Fact]
-    public void ReadOriginal_WithoutBackupOrClientFile()
+    public async Task Previews_AreNotDrawnWithoutAnOriginal()
     {
-        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
-
-        Assert.Equal(_fixture.Original, renderer.ReadOriginal(_fixture.InstallerOptions));
-        _fixture.FileSystem.DeleteFile(_fixture.IconPath);
-        Assert.Null(renderer.ReadOriginal(_fixture.InstallerOptions));
-    }
-
-    [Fact]
-    public void ReadOriginal_IgnoresADamagedBackup()
-    {
-        var installer = new PatchInstaller(_fixture.InstallerOptions, _fixture.FileSystem, _fixture.Processes);
-        installer.Apply(_manifest, new[] { "badges" }, _cache.Store);
+        CpLauncher.ViewModels.DashboardViewModel dashboard = await _fixture.CreateDashboardAsync();
+        await dashboard.ApplyCommand.ExecuteAsync(null);
         _fixture.FileSystem.Seed(_fixture.InstallerOptions.GetBackupPath(ClientFiles.IconUtx, _fixture.OriginalHash), new byte[] { 9 });
-        var renderer = new PackPreviewRenderer(_fixture.FileSystem);
 
-        Assert.Equal(_fixture.ReadIcon(), renderer.ReadOriginal(_fixture.InstallerOptions));
+        CpLauncher.ViewModels.DashboardViewModel damaged = await _fixture.CreateDashboardAsync(null);
+        _fixture.FileSystem.DeleteFile(_fixture.IconPath);
+        CpLauncher.ViewModels.DashboardViewModel missing = await _fixture.CreateDashboardAsync(null);
+
+        Assert.All(damaged.Packs, pack =>
+        {
+            Assert.Empty(pack.Thumbnails);
+        });
+        Assert.All(missing.Packs, pack =>
+        {
+            Assert.Empty(pack.Thumbnails);
+        });
     }
 }

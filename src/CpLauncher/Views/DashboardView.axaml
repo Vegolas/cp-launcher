@@ -18,13 +18,18 @@
           <TextBlock Classes="muted" Text="{Binding ClientDirectory, StringFormat='Klient: {0}'}" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Border Classes="notice success" Padding="10,4"
+          <Border Classes="notice success" Padding="10,4" MaxWidth="460"
                   IsVisible="{Binding UpdateText, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-              <TextBlock VerticalAlignment="Center" Text="{Binding UpdateText}" />
-              <Button Content="Aktualizuj" IsEnabled="False"
-                      ToolTip.Tip="Samoaktualizacja pojawi się w kolejnej wersji launchera." />
-            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="{Binding UpdateText}" TextWrapping="Wrap" />
+                <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding UpdateHint}"
+                           IsVisible="{Binding UpdateHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+              <Button Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Content="Aktualizuj"
+                      Command="{Binding UpdateLauncherCommand}"
+                      ToolTip.Tip="Pobiera nową wersję, sprawdza ją z podpisanymi przepisami i uruchamia launcher ponownie." />
+            </Grid>
           </Border>
           <Button Content="Odśwież" Command="{Binding RefreshCommand}" />
         </StackPanel>

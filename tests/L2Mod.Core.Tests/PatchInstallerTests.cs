@@ -312,6 +312,191 @@ public class PatchInstallerTests
         Assert.Throws<ArgumentException>(() => store.ReadAsset($"../assets/{hash}.png"));
     }
 
+    [Fact]
+    public void Reason_FollowsInstallUpToDateRebuildAndRestore()
+    {
+        Manifest manifest = CreateManifest();
+        Assert.Equal(PatchReason.NotInstalled, Single(_installer.GetStatus(manifest, Tags)).Reason);
+        Assert.Equal(PatchReason.NothingSelected, Single(_installer.GetStatus(manifest, Array.Empty<string>())).Reason);
+
+        Assert.Equal((PatchOutcome.Installed, PatchReason.NotInstalled), Describe(_installer.Apply(manifest, Tags, _assets)));
+        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(manifest, Tags)).Reason);
+        Assert.Equal((PatchOutcome.Unchanged, PatchReason.UpToDate), Describe(_installer.Apply(manifest, Tags, _assets)));
+        Assert.Equal(PatchReason.Outdated, Single(_installer.GetStatus(manifest, TagsAndBadges)).Reason);
+        Assert.Equal((PatchOutcome.Rebuilt, PatchReason.Outdated), Describe(_installer.Apply(manifest, TagsAndBadges, _assets)));
+        PatchFileStatus nothing = Single(_installer.GetStatus(manifest, Array.Empty<string>()));
+        Assert.Equal((PendingAction.Restore, PatchReason.NothingSelected), (nothing.Pending, nothing.Reason));
+        Assert.Equal((PatchOutcome.Restored, PatchReason.NothingSelected), Describe(_installer.Apply(manifest, Array.Empty<string>(), _assets)));
+    }
+
+    [Fact]
+    public void Reason_TellsKillSwitchNewerSchemaAndUnsupportedOriginalApart()
+    {
+        Manifest manifest = CreateManifest();
+        Assert.Equal(PatchReason.SwitchedOff, Single(_installer.GetStatus(CreateManifest(enabled: false), Tags)).Reason);
+        Assert.Equal(PatchReason.NeedsNewerLauncher, Single(_installer.GetStatus(manifest with { Schema = 2 }, Tags)).Reason);
+        _installer.Apply(manifest, Tags, _assets);
+        Manifest moved = manifest with
+        {
+            SupportedOriginals = new Dictionary<string, IReadOnlyList<string>> { [Icon] = new[] { new string('d', 64) } },
+        };
+
+        Assert.Equal((PatchOutcome.Unchanged, PatchReason.NeedsNewerLauncher), Describe(_installer.Apply(manifest with { Schema = 2 }, Tags, _assets)));
+        Assert.Equal((PatchOutcome.Unchanged, PatchReason.UnsupportedOriginal), Describe(_installer.Apply(moved, TagsAndBadges, _assets)));
+        PatchFileStatus off = Single(_installer.GetStatus(CreateManifest(enabled: false), Tags));
+        Assert.Equal((PendingAction.Restore, PatchReason.SwitchedOff), (off.Pending, off.Reason));
+        Assert.Equal((PatchOutcome.Restored, PatchReason.SwitchedOff), Describe(_installer.Apply(CreateManifest(enabled: false), Tags, _assets)));
+    }
+
+    [Fact]
+    public void Reason_ForUnknownMissingBlockedAndFailed()
+    {
+        _installer.Apply(CreateManifest(), Tags, _assets);
+        _fileSystem.Seed(_options.GetBackupPath(Icon, OriginalHash), new byte[] { 1 });
+        Assert.Equal((PatchOutcome.Failed, PatchReason.Error), Describe(_installer.Apply(CreateManifest(), TagsAndBadges, _assets)));
+
+        MakeUnknownVersion();
+        Assert.Equal(PatchReason.UnknownVersion, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal((PatchOutcome.Skipped, PatchReason.UnknownVersion), Describe(_installer.Apply(CreateManifest(), Tags, _assets)));
+
+        _processes.Running.Add("L2");
+        Assert.Equal((PatchOutcome.Blocked, PatchReason.GameRunning), Describe(_installer.Apply(CreateManifest(), Tags, _assets)));
+        Assert.Equal((PatchOutcome.Blocked, PatchReason.GameRunning), Describe(_installer.Restore()));
+        _processes.Running.Clear();
+
+        _fileSystem.DeleteFile(ClientPath);
+        Assert.Equal(PatchReason.FileMissing, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal((PatchOutcome.Skipped, PatchReason.FileMissing), Describe(_installer.Apply(CreateManifest(), Tags, _assets)));
+    }
+
+    [Fact]
+    public void Reason_ForRestoreOutcomes()
+    {
+        Assert.Equal((PatchOutcome.Skipped, PatchReason.NoBackup), Describe(_installer.Restore()));
+        _installer.Apply(CreateManifest(), Tags, _assets);
+
+        Assert.Equal((PatchOutcome.Restored, PatchReason.RestoreRequested), Describe(_installer.Restore()));
+        Assert.Equal((PatchOutcome.Unchanged, PatchReason.AlreadyOriginal), Describe(_installer.Restore()));
+    }
+
+    [Fact]
+    public void ReadOriginal_IsTheClientFileWhileItIsASupportedOriginal()
+    {
+        Assert.Equal(_original, _installer.ReadOriginal(CreateManifest(), Icon));
+
+        _fileSystem.DeleteFile(ClientPath);
+
+        Assert.Null(_installer.ReadOriginal(CreateManifest(), Icon));
+    }
+
+    [Fact]
+    public void ReadOriginal_IsTheVerifiedBackupWhileOurPatchIsInstalled()
+    {
+        _installer.Apply(CreateManifest(), TagsAndBadges, _assets);
+
+        Assert.NotEqual(_original, _fileSystem.ReadAllBytes(ClientPath));
+        Assert.Equal(_original, _installer.ReadOriginal(CreateManifest(), Icon));
+
+        _fileSystem.Seed(_options.GetBackupPath(Icon, OriginalHash), new byte[] { 9 });
+
+        Assert.Null(_installer.ReadOriginal(CreateManifest(), Icon));
+    }
+
+    [Fact]
+    public void ReadOriginal_NeverDrawsOnAnUnknownVersionButPrefersANewSupportedOriginal()
+    {
+        Assert.Null(new PatchInstaller(_options, _fileSystem, _processes).ReadOriginal(CreateManifest() with { SupportedOriginals = new Dictionary<string, IReadOnlyList<string>>() }, Icon));
+        _installer.Apply(CreateManifest(), Tags, _assets);
+        byte[] updatedByDex = MakeUnknownVersion();
+
+        Assert.Equal(_original, _installer.ReadOriginal(CreateManifest(), Icon));
+
+        Manifest supportsTheUpdate = CreateManifest() with
+        {
+            SupportedOriginals = new Dictionary<string, IReadOnlyList<string>> { [Icon] = new[] { OriginalHash, ContentHash.Sha256Hex(updatedByDex) } },
+        };
+
+        Assert.Equal(updatedByDex, _installer.ReadOriginal(supportsTheUpdate, Icon));
+    }
+
+    [Fact]
+    public void ReadOriginal_DamagedStateJsonIsAnError()
+    {
+        MakeUnknownVersion();
+        _fileSystem.Seed(_options.StatePath, "{ broken"u8.ToArray());
+
+        Assert.Throws<InvalidDataException>(() => _installer.ReadOriginal(CreateManifest(), Icon));
+    }
+
+    [Fact]
+    public void State_IsKeptPerClientFolder()
+    {
+        var otherOptions = new InstallerOptions(@"C:\other", @"C:\data");
+        string otherIcon = otherOptions.GetClientPath(Icon);
+        _fileSystem.Seed(otherIcon, _original);
+        var other = new PatchInstaller(otherOptions, _fileSystem, _processes);
+        _installer.Apply(CreateManifest(), Tags, _assets);
+
+        PatchFileStatus otherBefore = Single(other.GetStatus(CreateManifest(), TagsAndBadges));
+        Assert.Equal((PatchFileState.Original, PendingAction.Install, false), (otherBefore.State, otherBefore.Pending, otherBefore.HasBackup));
+        Assert.Equal(PatchOutcome.Installed, Single(other.Apply(CreateManifest(), TagsAndBadges, _assets)).Outcome);
+
+        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchReason.UpToDate, Single(other.GetStatus(CreateManifest(), TagsAndBadges)).Reason);
+        Assert.Equal(PatchOutcome.Restored, Single(other.Restore()).Outcome);
+        Assert.Equal(_original, _fileSystem.ReadAllBytes(otherIcon));
+        Assert.Equal(Build(Tags), _fileSystem.ReadAllBytes(ClientPath));
+        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+    }
+
+    [Fact]
+    public void State_ClientFolderIgnoresCaseAndATrailingSeparator()
+    {
+        _installer.Apply(CreateManifest(), Tags, _assets);
+        var sameFolder = new PatchInstaller(new InstallerOptions(@"c:\CLIENT\", @"C:\data"), _fileSystem, _processes);
+
+        Assert.Equal(PatchReason.UpToDate, Single(sameFolder.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(new InstallerOptions(@"c:\CLIENT\", @"C:\data").ClientId, _options.ClientId);
+        Assert.Equal(16, _options.ClientId.Length);
+    }
+
+    [Fact]
+    public void State_FromBeforeTheClientSections_IsAdoptedByTheFirstClientFolder()
+    {
+        _installer.Apply(CreateManifest(), Tags, _assets);
+        InstalledFile installed = new InstallStateStore(_fileSystem, _options.StatePath, _options.ClientDirectory).Load().Get(Icon)!;
+        string legacy = $$"""
+            { "files": { "Icon.utx": { "originalSha256": "{{installed.OriginalSha256}}", "patchedSha256": "{{installed.PatchedSha256}}", "recipeKey": "{{installed.RecipeKey}}" } } }
+            """;
+        _fileSystem.Seed(_options.StatePath, System.Text.Encoding.UTF8.GetBytes(legacy));
+
+        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchOutcome.Rebuilt, Single(_installer.Apply(CreateManifest(), TagsAndBadges, _assets)).Outcome);
+
+        System.Text.Json.Nodes.JsonObject saved = System.Text.Json.Nodes.JsonNode.Parse(_fileSystem.ReadAllBytes(_options.StatePath))!.AsObject();
+        Assert.False(saved.ContainsKey("files"));
+        Assert.Equal(new[] { _options.ClientKey }, saved["clients"]!.AsObject().Select(client => client.Key));
+        var other = new PatchInstaller(new InstallerOptions(@"C:\other", @"C:\data"), _fileSystem, _processes);
+        _fileSystem.Seed(Path.Combine(@"C:\other", "SysTextures", "Icon.utx"), _original);
+        Assert.Equal(PatchReason.NotInstalled, Single(other.GetStatus(CreateManifest(), Tags)).Reason);
+    }
+
+    [Fact]
+    public void State_WithoutFilesOrClientsIsDamaged()
+    {
+        _fileSystem.Seed(_options.StatePath, "{ }"u8.ToArray());
+
+        Assert.Throws<InvalidDataException>(() => _installer.GetStatus(CreateManifest(), Tags));
+        Assert.Equal(PatchOutcome.Failed, Single(_installer.Apply(CreateManifest(), Tags, _assets)).Outcome);
+        Assert.Equal(_original, _fileSystem.ReadAllBytes(ClientPath));
+    }
+
+    private static (PatchOutcome Outcome, PatchReason Reason) Describe(IReadOnlyList<PatchFileResult> results)
+    {
+        PatchFileResult result = Single(results);
+        return (result.Outcome, result.Reason);
+    }
+
     private byte[] MakeUnknownVersion()
     {
         byte[] unknown = (byte[])_original.Clone();

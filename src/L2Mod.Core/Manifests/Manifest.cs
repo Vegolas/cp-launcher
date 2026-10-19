@@ -70,7 +70,82 @@ public sealed record Pack(string Id, string Name, bool Default, IReadOnlyList<II
 public sealed record OptionPreset(string Id, string Name, IReadOnlyList<IniValue> Values);
 
 /// <summary>A parsed manifest plus what was skipped and why (shown to the user, not fatal).</summary>
-public sealed record ManifestReadResult(Manifest Manifest, IReadOnlyList<string> Messages);
+public sealed record ManifestReadResult(Manifest Manifest, IReadOnlyList<ManifestNote> Notes)
+{
+    /// <summary>The English <see cref="ManifestNote.Message"/> of every note, in order.</summary>
+    public IReadOnlyList<string> Messages
+    {
+        get
+        {
+            return Notes.Select(note => note.Message).ToList();
+        }
+    }
+}
+
+/// <summary>What a <see cref="ManifestNote"/> is about.</summary>
+public enum ManifestNoteCode
+{
+    /// <summary>A newer schema: only the envelope (enabled, launcher) was read, no packs or presets.</summary>
+    UnsupportedSchema,
+
+    /// <summary>The launcher entry of a newer-schema manifest could not be read; no self-update from it.</summary>
+    LauncherIgnored,
+
+    /// <summary>supportedOriginals names a file that is not patchable.</summary>
+    OriginalIgnored,
+
+    AnnouncementSkipped,
+
+    /// <summary>More announcements than <see cref="ManifestLimits.MaxAnnouncements"/>; the rest are not shown.</summary>
+    AnnouncementLimit,
+
+    PackSkipped,
+
+    /// <summary>More packs than <see cref="ManifestLimits.MaxPacks"/>; the rest are skipped.</summary>
+    PackLimit,
+
+    PresetSkipped,
+
+    /// <summary>More presets than <see cref="ManifestLimits.MaxPresets"/>; the rest are skipped.</summary>
+    PresetLimit,
+}
+
+/// <summary>Why an announcement, pack or preset was skipped.</summary>
+public enum ManifestSkipReason
+{
+    /// <summary>The note is not about a skipped item (schema, limits, supportedOriginals).</summary>
+    None,
+
+    /// <summary>A missing, malformed or out-of-range value.</summary>
+    InvalidValue,
+
+    /// <summary>An operation kind this launcher does not know (probably needs a newer launcher).</summary>
+    UnknownOperation,
+
+    /// <summary>A field this launcher does not know in an operation (probably needs a newer launcher).</summary>
+    UnknownField,
+
+    /// <summary>An operation on a client file outside the whitelist.</summary>
+    FileNotAllowed,
+
+    /// <summary>More operations or values than the limits allow.</summary>
+    OverLimit,
+
+    /// <summary>Another pack or preset already has this id.</summary>
+    DuplicateId,
+
+    /// <summary>A preset sets a window position key (GamePlayViewport*).</summary>
+    ForbiddenKey,
+}
+
+/// <summary>
+/// One thing the parser skipped or ignored, structured so a UI can describe it in its own language;
+/// <see cref="Message"/> is the English text (also in <see cref="ManifestReadResult.Messages"/>).
+/// </summary>
+/// <param name="ItemId">The pack or preset id as written in the manifest (shortened, possibly invalid), or null.</param>
+/// <param name="ItemName">Its name (an announcement's title) as written, shortened and without control
+/// characters, or null.</param>
+public sealed record ManifestNote(ManifestNoteCode Code, ManifestSkipReason Reason, string? ItemId, string? ItemName, string Message);
 
 /// <summary>The manifest cannot be used at all (bad JSON, missing envelope fields, too large, bad signature).</summary>
 public sealed class ManifestException : Exception
