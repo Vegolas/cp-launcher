@@ -9,20 +9,32 @@ namespace L2Mod.Cli.Leader;
 /// <summary>Default locations of the leader's files; tests pass temporary ones.</summary>
 public sealed record LeaderDefaults(string PrivateKeyPath, string PublicKeyPath, string PreviewDirectory)
 {
-    /// <summary>Private key in %USERPROFILE%\.l2mod, public key and previews relative to the current folder (the repo root).</summary>
+    public const string DefaultRepository = "Vegolas/cp-launcher";
+
+    /// <summary>The public key the launcher embeds; publish refuses a dist signed for another key. Null skips the check.</summary>
+    public string? LauncherPublicKeyPath { get; init; }
+
+    /// <summary>The GitHub repository ("owner/name") whose releases and Pages carry the dist.</summary>
+    public string Repository { get; init; } = DefaultRepository;
+
+    /// <summary>Private key in %USERPROFILE%\.l2mod, public keys and previews relative to the current folder (the repo root).</summary>
     public static LeaderDefaults ForCurrentUser()
     {
         string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return new LeaderDefaults(
             Path.Combine(profile, ".l2mod", "signing-private.pem"),
             Path.GetFullPath(Path.Combine("keys", "signing-public.pem")),
-            Path.GetFullPath(Path.Combine("work", "preview", "packs")));
+            Path.GetFullPath(Path.Combine("work", "preview", "packs")))
+        {
+            LauncherPublicKeyPath = Path.GetFullPath(Path.Combine("src", "CpLauncher", "Keys", "manifest-public.pem")),
+        };
     }
 }
 
 /// <summary>
-/// The CP leader's commands: keygen, build, sign, verify and publish (a dry run until hosting is chosen).
-/// Bad input throws (the CLI prints it); a failed check prints the reasons and returns <see cref="ExitFailed"/>.
+/// The CP leader's commands: keygen, build, sign, verify, publish (a GitHub release plus the Pages deployment), and
+/// stage-pages, which the Pages workflow runs. Bad input throws (the CLI prints it); a failed check prints the
+/// reasons and returns <see cref="ExitFailed"/>.
 /// </summary>
 public sealed class LeaderCommands
 {
@@ -31,24 +43,31 @@ public sealed class LeaderCommands
     public const int ExitUsage = 2;
 
     private const int DefaultPreviewScale = 4;
-    private const string DefaultBucket = "<bucket>";
+    private const string GitHubCli = "gh";
 
     private readonly TextWriter _output;
     private readonly TextWriter _error;
     private readonly LeaderDefaults _defaults;
+    private readonly ICommandRunner _runner;
 
     public LeaderCommands(TextWriter output, TextWriter error, LeaderDefaults defaults)
+        : this(output, error, defaults, new ProcessCommandRunner())
+    {
+    }
+
+    public LeaderCommands(TextWriter output, TextWriter error, LeaderDefaults defaults, ICommandRunner runner)
     {
         _output = output;
         _error = error;
         _defaults = defaults;
+        _runner = runner;
     }
 
     public static IReadOnlyList<string> Names
     {
         get
         {
-            return new[] { "keygen", "build", "sign", "verify", "publish" };
+            return new[] { "keygen", "build", "sign", "verify", "publish", "stage-pages" };
         }
     }
 
@@ -60,7 +79,10 @@ public sealed class LeaderCommands
         output.WriteLine("          default previews work/preview/packs (they show NCSoft icons: never inside out-dir, never published)");
         output.WriteLine("  sign    <dist-dir> [--key <private.pem>] [--public <public.pem>]");
         output.WriteLine("  verify  <dist-dir> [--public <public.pem>]");
-        output.WriteLine("  publish <dist-dir> [--public <public.pem>] [--bucket <name>]   (dry run: prints the upload plan, uploads nothing)");
+        output.WriteLine("  publish <dist-dir> [--public <public.pem>] [--repo owner/name] [--dry-run]");
+        output.WriteLine("          uploads dist-<version>.zip as a GitHub release and starts the Pages deployment (needs gh, logged in)");
+        output.WriteLine("  stage-pages <dist.zip|dist-dir> --out <site-dir> [--public <public.pem>] [--previous <dist.zip|dist-dir>]");
+        output.WriteLine("          run by .github/workflows/pages.yml: verifies a published dist and writes the site, keeping the previous version's files");
     }
 
     public int Run(string name, IReadOnlyList<string> arguments)
@@ -77,6 +99,8 @@ public sealed class LeaderCommands
                 return Verify(arguments);
             case "publish":
                 return Publish(arguments);
+            case "stage-pages":
+                return StagePages(arguments);
             default:
                 throw new ArgumentException($"Unknown leader command '{name}'.");
         }
@@ -268,22 +292,28 @@ public sealed class LeaderCommands
             _output.WriteLine($"  {pack.Id,-20} {pack.Operations.Count,4} operation(s)");
         }
 
-        foreach (string file in FindUnreferenced(distPath, result))
+        foreach (string file in DistVerifier.FindUnreferenced(distPath, result))
         {
-            _output.WriteLine($"  warning: {file} is not referenced by the manifest and will not be uploaded.");
+            _output.WriteLine($"  warning: {file} is not referenced by the manifest and will not be published.");
         }
 
         return ExitOk;
     }
 
+    /// <summary>
+    /// Verifies the dist, uploads it as the release dist-&lt;version&gt; (one zip, never replaced) and starts the
+    /// Pages workflow, which verifies it again against the key the launcher embeds and deploys it. The private key
+    /// never leaves this computer.
+    /// </summary>
     public int Publish(IReadOnlyList<string> arguments)
     {
-        CommandLine command = CommandLine.Parse(arguments, new[] { "public", "bucket" }, Array.Empty<string>());
+        CommandLine command = CommandLine.Parse(arguments, new[] { "public", "repo" }, new[] { "dry-run" });
         if (command.Positional.Count != 1)
         {
             return Usage();
         }
 
+        PagesTarget target = PagesTarget.Parse(command.GetOption("repo") ?? _defaults.Repository);
         string distPath = Path.GetFullPath(command.Positional[0]);
         string publicPem = File.ReadAllText(ResolvePublicKey(command.GetOption("public"), true)!);
         DistVerification result = DistVerifier.Verify(distPath, publicPem);
@@ -292,28 +322,107 @@ public sealed class LeaderCommands
             return Fail(result.Errors, "Nothing published.");
         }
 
-        string bucket = command.GetOption("bucket") ?? DefaultBucket;
-        IReadOnlyList<UploadStep> steps = UploadPlan.Create(result);
-        _output.WriteLine("DRY RUN: hosting is not chosen yet (likely Cloudflare R2 via wrangler). Nothing was uploaded.");
-        _output.WriteLine($"Verified {distPath}: version {result.Manifest!.Version}, signed by {SigningKeys.GetFingerprint(publicPem)}.");
-        _output.WriteLine("Planned upload, in this order (manifest last, so members never see it before its files):");
-        for (int i = 0; i < steps.Count; i++)
+        string? keyProblem = CheckLauncherKey(publicPem);
+        if (keyProblem is not null)
         {
-            _output.WriteLine($"  {i + 1,3}. {steps[i].Path}  [{steps[i].ContentType}; Cache-Control: {steps[i].CacheControl}]");
+            return Fail(new[] { keyProblem }, "Nothing published.");
         }
 
-        _output.WriteLine("Equivalent wrangler commands:");
-        foreach (UploadStep step in steps)
-        {
-            _output.WriteLine($"  {UploadPlan.ToWranglerCommand(step, distPath, bucket)}");
-        }
-
-        foreach (string file in FindUnreferenced(distPath, result))
+        Manifest manifest = result.Manifest!;
+        string tag = PagesTarget.GetTag(manifest.Version);
+        _output.WriteLine($"Verified {distPath}: version {manifest.Version}, signed by {SigningKeys.GetFingerprint(publicPem)}.");
+        foreach (string file in DistVerifier.FindUnreferenced(distPath, result))
         {
             _output.WriteLine($"  skipped: {file} (not referenced by the manifest)");
         }
 
+        string[] deploy = { "workflow", "run", PagesTarget.Workflow, "--repo", target.Repository, "--ref", "main", "-f", "tag=" + tag };
+        if (command.HasFlag("dry-run"))
+        {
+            _output.WriteLine($"DRY RUN: nothing uploaded. Would archive {result.ReferencedFiles.Count + 2} file(s) into {tag}.zip and run:");
+            _output.WriteLine($"  {GitHubCli} {FormatArguments(ReleaseArguments(target, manifest, tag + ".zip", "notes.md"))}");
+            _output.WriteLine($"  {GitHubCli} {FormatArguments(deploy)}");
+            return ExitOk;
+        }
+
+        string scratch = NewScratchPath("l2mod-publish-");
+        try
+        {
+            string zipPath = Path.Combine(scratch, tag + ".zip");
+            string notesPath = Path.Combine(scratch, "notes.md");
+            IReadOnlyList<string> entries = DistArchive.Create(distPath, result, zipPath);
+            File.WriteAllText(notesPath, BuildReleaseNotes(manifest, target), new UTF8Encoding(false));
+            _output.WriteLine($"Archived {entries.Count} file(s) into {tag}.zip ({new FileInfo(zipPath).Length} bytes).");
+            if (_runner.Run(GitHubCli, ReleaseArguments(target, manifest, zipPath, notesPath)) != 0)
+            {
+                string message = $"gh release create failed. If {tag} already exists, that version is published: bump \"version\" in recipes.json and rebuild (a published version is never replaced).";
+                return Fail(new[] { message }, "Nothing published.");
+            }
+
+            if (_runner.Run(GitHubCli, deploy) != 0)
+            {
+                string message = $"The release {tag} exists, but the deployment did not start. Start it with: {GitHubCli} {FormatArguments(deploy)}";
+                return Fail(new[] { message }, "Not deployed.");
+            }
+        }
+        finally
+        {
+            DeleteScratch(scratch);
+        }
+
+        _output.WriteLine($"Deployment started: https://github.com/{target.Repository}/actions/workflows/{PagesTarget.Workflow}");
+        _output.WriteLine($"After a green run, launchers get it from {target.SiteUri}{DistLayout.ManifestFile} within about 10 minutes (GitHub Pages caches for 600 s).");
         return ExitOk;
+    }
+
+    /// <summary>
+    /// The Pages workflow's step: the published dist (archive or folder) verified against the public key, written
+    /// to an empty site folder together with the files of the previous version (the one live until now).
+    /// </summary>
+    public int StagePages(IReadOnlyList<string> arguments)
+    {
+        CommandLine command = CommandLine.Parse(arguments, new[] { "public", "previous", "out" }, Array.Empty<string>());
+        string? sitePath = command.GetOption("out");
+        if (command.Positional.Count != 1 || sitePath is null)
+        {
+            return Usage();
+        }
+
+        string publicPem = File.ReadAllText(ResolvePublicKey(command.GetOption("public"), true)!);
+        var scratch = new List<string>();
+        try
+        {
+            string distPath = OpenDist(command.Positional[0], scratch);
+            string? previousOption = command.GetOption("previous");
+            string? previousPath = null;
+            if (previousOption is not null)
+            {
+                previousPath = OpenDist(previousOption, scratch);
+            }
+
+            string site = Path.GetFullPath(sitePath);
+            PagesStageResult result = PagesSite.Stage(distPath, publicPem, previousPath, site);
+            foreach (string warning in result.Warnings)
+            {
+                _output.WriteLine($"  warning: {warning}");
+            }
+
+            if (!result.IsValid)
+            {
+                return Fail(result.Errors, "Site not staged.");
+            }
+
+            _output.WriteLine($"Staged {site}: version {result.Manifest!.Version}, signed by {SigningKeys.GetFingerprint(publicPem)}.");
+            _output.WriteLine($"  {result.Files.Count} file(s) of this version, {result.KeptFromPrevious.Count} kept from the previous one.");
+            return ExitOk;
+        }
+        finally
+        {
+            foreach (string directory in scratch)
+            {
+                DeleteScratch(directory);
+            }
+        }
     }
 
     /// <summary>The nearest folder at or above <paramref name="path"/> that holds a .git folder or file, or null.</summary>
@@ -360,16 +469,123 @@ public sealed class LeaderCommands
         return null;
     }
 
-    private static IEnumerable<string> FindUnreferenced(string distPath, DistVerification result)
+    /// <summary>Null when the launcher embeds the key the dist is signed for (or there is no launcher key to check).</summary>
+    private string? CheckLauncherKey(string publicPem)
     {
-        foreach (string file in DistWriter.ListFiles(distPath))
+        string? path = _defaults.LauncherPublicKeyPath;
+        if (path is null)
         {
-            if (file == DistLayout.ManifestFile || file == DistLayout.SignatureFile || result.ReferencedFiles.Contains(file, StringComparer.Ordinal))
-            {
-                continue;
-            }
+            return null;
+        }
 
-            yield return file;
+        if (!File.Exists(path))
+        {
+            _output.WriteLine($"  warning: {path} not found; cannot check that the launcher trusts this key (the Pages deployment checks it).");
+            return null;
+        }
+
+        string launcherFingerprint = SigningKeys.GetFingerprint(File.ReadAllText(path));
+        string fingerprint = SigningKeys.GetFingerprint(publicPem);
+        if (launcherFingerprint == fingerprint)
+        {
+            return null;
+        }
+
+        return $"The launcher embeds another public key ({path}, fingerprint {launcherFingerprint}) than the one this dist is signed for ({fingerprint}). "
+            + "The Pages deployment would refuse it and launchers would reject it: put the public key into the launcher and release that launcher first.";
+    }
+
+    private static string[] ReleaseArguments(PagesTarget target, Manifest manifest, string zipPath, string notesPath)
+    {
+        string tag = PagesTarget.GetTag(manifest.Version);
+        return new[]
+        {
+            "release", "create", tag, zipPath,
+            "--repo", target.Repository,
+            "--target", "main",
+            "--title", $"Recipes {manifest.Version}",
+            "--notes-file", notesPath,
+            "--latest=false",
+        };
+    }
+
+    private static string BuildReleaseNotes(Manifest manifest, PagesTarget target)
+    {
+        var notes = new StringBuilder();
+        notes.AppendLine($"Signed recipes {manifest.Version} for the CP launcher (enabled: {manifest.Enabled.ToString().ToLowerInvariant()}).");
+        notes.AppendLine();
+        foreach (Pack pack in manifest.Packs)
+        {
+            notes.AppendLine($"- pack `{pack.Id}`: {pack.Operations.Count} operation(s)");
+        }
+
+        string launcher = "none";
+        if (manifest.Launcher is not null)
+        {
+            launcher = manifest.Launcher.Version;
+        }
+
+        notes.AppendLine($"- launcher release: {launcher}");
+        notes.AppendLine();
+        notes.AppendLine($"Deployed to {target.SiteUri} by the `{PagesTarget.Workflow}` workflow, which verifies the archive against the public key the launcher embeds.");
+        return notes.ToString();
+    }
+
+    private static string FormatArguments(IEnumerable<string> arguments)
+    {
+        var formatted = new List<string>();
+        foreach (string argument in arguments)
+        {
+            if (argument.Contains(' '))
+            {
+                formatted.Add($"\"{argument}\"");
+            }
+            else
+            {
+                formatted.Add(argument);
+            }
+        }
+
+        return string.Join(" ", formatted);
+    }
+
+    /// <summary>A dist folder as it is, or a published archive extracted into a new scratch folder.</summary>
+    private static string OpenDist(string path, List<string> scratch)
+    {
+        string full = Path.GetFullPath(path);
+        if (Directory.Exists(full))
+        {
+            return full;
+        }
+
+        if (!File.Exists(full))
+        {
+            throw new FileNotFoundException($"{full} not found.", full);
+        }
+
+        string directory = NewScratchPath("l2mod-stage-");
+        scratch.Add(directory);
+        DistArchive.Extract(full, directory);
+        return directory;
+    }
+
+    private static string NewScratchPath(string prefix)
+    {
+        return Path.Combine(Path.GetTempPath(), prefix + Guid.NewGuid().ToString("N"));
+    }
+
+    private static void DeleteScratch(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Best effort; a locked file only leaves a stray temp folder.
         }
     }
 

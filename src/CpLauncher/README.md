@@ -15,8 +15,8 @@ the install state machine and the self-update are L2Mod.Core.
   (running version), `LauncherLog`, game start, bootstrap.
 - `ViewModels/` – `MainWindowViewModel` (setup ↔ dashboard), `SetupViewModel`, `DashboardViewModel`.
 - `Views/` – XAML, `RgbaImageConverter`, dialogs.
-- `Keys/manifest-public.pem` – **placeholder** public key (nobody has its private half). Replace it with the
-  leader key from the Phase 2 keygen before the first release.
+- `Keys/manifest-public.pem` – the leader's public key (a copy of `keys/signing-public.pem` from `keygen`). It must
+  stay identical to that file: `publish` and the Pages workflow refuse a dist the launcher would reject.
 
 ## Data
 `%LocalAppData%\CpLauncher\`: `settings.json`, `state.json` (one section per client folder),

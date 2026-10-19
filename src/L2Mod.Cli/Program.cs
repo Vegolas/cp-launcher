@@ -40,6 +40,7 @@ try
         case "sign":
         case "verify":
         case "publish":
+        case "stage-pages":
             return new LeaderCommands(Console.Out, Console.Error, LeaderDefaults.ForCurrentUser()).Run(args[0].ToLowerInvariant(), rest);
         default:
             PrintUsage();
