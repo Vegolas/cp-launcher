@@ -1,0 +1,105 @@
+name: Pages
+
+# Deploys a signed dist to GitHub Pages (https://vegolas.github.io/cp-launcher/, the launcher's built-in source).
+# The leader's `publish` uploads dist-<version>.zip as the release dist-<version> and starts this workflow; start it
+# by hand with an older tag to roll back. There is no private key here: stage-pages verifies the archive against the
+# public key the launcher embeds and refuses anything else.
+# Runs from main only: the github-pages environment deploys only from the default branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release with the signed dist (dist-<version>)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  SITE_URL: https://vegolas.github.io/cp-launcher/
+  # The tag only ever reaches the scripts through this variable, never through ${{ }} inside a script.
+  TAG: ${{ inputs.tag }}
+
+jobs:
+  stage:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Download the dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! "$TAG" =~ ^dist-[A-Za-z0-9.+-]+$ ]]; then
+            echo "::error::'$TAG' is not a dist-<version> tag."
+            exit 1
+          fi
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.zip' --dir in
+          if [ "$(ls in | wc -l)" -ne 1 ]; then
+            echo "::error::The release $TAG must hold exactly one .zip."
+            exit 1
+          fi
+
+      # Each deployment replaces the whole site, while the CDN serves the old manifest for up to 10 minutes:
+      # the files of the version that is live now stay on the site for launchers that still hold its manifest.
+      - name: Download the live version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          live="$(curl -fsS "${SITE_URL}manifest.json" | jq -r '.version' || true)"
+          if [ -z "$live" ] || [ "$live" = "null" ]; then
+            echo "No live manifest: first deployment."
+            exit 0
+          fi
+
+          if [ "dist-$live" = "$TAG" ]; then
+            echo "Redeploying the live version $live."
+            exit 0
+          fi
+
+          if gh release download "dist-$live" --repo "$GITHUB_REPOSITORY" --pattern '*.zip' --dir previous; then
+            echo "Keeping the files of the live version $live."
+          else
+            echo "::warning::The live version $live has no release dist-$live; its files are not kept."
+            rm -rf previous
+          fi
+
+      - name: Stage the site
+        run: |
+          args=(stage-pages in/*.zip --public src/CpLauncher/Keys/manifest-public.pem --out _site)
+          if [ -d previous ]; then
+            args+=(--previous previous/*.zip)
+          fi
+          dotnet run --project src/L2Mod.Cli -c Release -- "${args[@]}"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -89,6 +89,23 @@ public static class DistVerifier
         return new DistVerification(manifest, referenced, errors);
     }
 
+    /// <summary>Files in the folder that are neither the manifest, its signature nor referenced by it (sorted, '/' separators).</summary>
+    public static IReadOnlyList<string> FindUnreferenced(string distDirectory, DistVerification verification)
+    {
+        var unreferenced = new List<string>();
+        foreach (string file in DistWriter.ListFiles(distDirectory))
+        {
+            if (file == DistLayout.ManifestFile || file == DistLayout.SignatureFile || verification.ReferencedFiles.Contains(file, StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            unreferenced.Add(file);
+        }
+
+        return unreferenced;
+    }
+
     private static void CheckAsset(string distDirectory, OverlayOperation overlay, List<string> errors)
     {
         string path = DistLayout.GetFullPath(distDirectory, overlay.Image);

@@ -102,12 +102,13 @@ public sealed record LauncherSettings
 public static class LauncherDefaults
 {
     /// <summary>
-    /// TODO(release): the public address of the CP distribution (manifest.json, manifest.json.sig, assets/), set
-    /// before the first release. It is compiled in, so released launchers keep asking this address: it has to stay
-    /// valid for as long as those versions are in use (a domain of our own survives a move away from r2.dev).
-    /// A member's own value in the settings overrides it.
+    /// The public address of the CP distribution (manifest.json, manifest.json.sig, assets/, launcher/): the GitHub
+    /// Pages site of Vegolas/cp-launcher, deployed by .github/workflows/pages.yml. It is compiled in, so released
+    /// launchers keep asking this address: never rename the repository or the account (Pages does not redirect),
+    /// and keep the repository public. Moving elsewhere means releasing a launcher with the new address here first
+    /// and keeping this site until every member has updated. A member's own value in the settings overrides it.
     /// </summary>
-    public const string? ManifestSource = null;
+    public const string ManifestSource = "https://vegolas.github.io/cp-launcher/";
 }
 
 public sealed record SettingsLoadResult(LauncherSettings Settings, string? Problem);

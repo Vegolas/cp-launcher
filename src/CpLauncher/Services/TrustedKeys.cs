@@ -10,9 +10,8 @@ public static class TrustedKeys
     private const string ResourceName = "CpLauncher.Keys.manifest-public.pem";
 
     /// <summary>
-    /// The leader's public key, embedded in the exe.
-    /// TODO(phase 2): Keys\manifest-public.pem is a placeholder whose private half was discarded, so nothing
-    /// verifies against it; replace it with the public key from the leader tool's keygen before the first release.
+    /// The leader's public key, embedded in the exe: Keys\manifest-public.pem, a copy of keys\signing-public.pem from
+    /// the leader tool's keygen. The Pages workflow verifies every published dist against this same file.
     /// </summary>
     public static TrustedKey Embedded
     {
