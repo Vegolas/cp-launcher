@@ -84,8 +84,10 @@ public sealed record LauncherSettings
 public static class LauncherDefaults
 {
     /// <summary>
-    /// TODO(hosting): the public R2 address of the CP distribution (manifest.json, manifest.json.sig, assets/).
-    /// Hosting is not chosen yet, so members have to enter the source in the settings until this is filled in.
+    /// TODO(release): the public address of the CP distribution (manifest.json, manifest.json.sig, assets/), set
+    /// before the first release. It is compiled in, so released launchers keep asking this address: it has to stay
+    /// valid for as long as those versions are in use (a domain of our own survives a move away from r2.dev).
+    /// A member's own value in the settings overrides it.
     /// </summary>
     public const string? ManifestSource = null;
 }

@@ -5,8 +5,8 @@ namespace CpLauncher.Services;
 public sealed record GameExecutableOption(string RelativePath, string Label);
 
 /// <summary>
-/// What "Uruchom L2Dex" starts. Open question for the user: does the CP start Dex through L2Updater.exe in the
-/// client root or data\L2Launcher.exe? Both are offered; the choice is a setting.
+/// What "Uruchom L2Dex" starts: L2Updater.exe in the client root, the way the CP starts Dex (confirmed 2026-10-19).
+/// data\L2Launcher.exe stays selectable in the launcher settings.
 /// </summary>
 public static class GameExecutables
 {
@@ -20,7 +20,6 @@ public static class GameExecutables
         }
     }
 
-    // TODO(open question): confirm which executable the CP uses and make it the default.
     public static string Default
     {
         get
