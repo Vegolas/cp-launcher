@@ -34,6 +34,7 @@ Background research: `..\.docs\l2-client-patch-research.md`.
 - CP launcher plan: `..\.docs\cp-launcher-v1-plan.md`.
 - `tests/L2Mod.Core.Tests` – xUnit (also covers the CLI's `CommandLine`); `TestPackageBuilder`/`TestIcons` build synthetic L2-style packages, `Fakes.cs` has in-memory file system, process monitor and asset store.
 - `work/` – local copies of game files and previews (never commit or share: NCSoft assets).
+- `.github/workflows/ci.yml` – CI on the private GitHub repo `Vegolas/cp-launcher` (push to main, PRs): windows-latest, Release build with `-warnaserror`, all tests, single-file publish with trim warnings as errors, the exe as a 7-day artifact. Never add game files or real keys to CI; the self-update E2E stays manual.
 
 ## Commands
 ```
