@@ -6,7 +6,11 @@
              x:Class="CpLauncher.Views.DashboardView"
              x:DataType="vm:DashboardViewModel">
   <Grid RowDefinitions="Auto,*,Auto">
-    <!-- Title bar: name and version on the left, Odśwież / Ustawienia before the window's caption buttons. -->
+    <!--
+      Title bar: name and version on the left, Odśwież / Ustawienia before the window's caption buttons. Controls
+      in the drag region need ElementRole="User": the window's hit test ignores elements without a role, so a
+      click would fall through to the TitleBar and move the window instead.
+    -->
     <Border Classes="titlebar" WindowDecorationProperties.ElementRole="TitleBar">
       <Grid ColumnDefinitions="Auto,*,Auto" Margin="18,0,148,0">
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -15,13 +19,14 @@
           <TextBlock Classes="muted small" Text="{Binding LauncherVersionText}" VerticalAlignment="Center" Margin="2,3,0,0" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-          <Button Classes="ghost" Command="{Binding RefreshCommand}" ToolTip.Tip="Pobiera przepisy jeszcze raz i sprawdza Icon.utx.">
+          <Button Classes="ghost" Command="{Binding RefreshCommand}" WindowDecorationProperties.ElementRole="User"
+                  ToolTip.Tip="Pobiera przepisy jeszcze raz i sprawdza Icon.utx.">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBlock Classes="glyph" Text="&#xE72C;" />
               <TextBlock Text="Odśwież" />
             </StackPanel>
           </Button>
-          <ToggleButton Classes="ghost" IsChecked="{Binding IsSettingsOpen}">
+          <ToggleButton Classes="ghost" IsChecked="{Binding IsSettingsOpen}" WindowDecorationProperties.ElementRole="User">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBlock Classes="glyph" Text="&#xE713;" />
               <TextBlock Text="Ustawienia" />
