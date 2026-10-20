@@ -65,15 +65,10 @@ public static class DistBuilder
             launcher = AddLauncher(project.Launcher, files);
         }
 
-        var descriptions = new Dictionary<string, string>(StringComparer.Ordinal);
         var packs = new List<Pack>();
         foreach (CompiledPack pack in compiled.Packs)
         {
             packs.Add(pack.ToManifestPack());
-            if (pack.Recipe.Description is not null)
-            {
-                descriptions[pack.Recipe.Id] = pack.Recipe.Description;
-            }
         }
 
         var manifest = new Manifest(
@@ -85,7 +80,7 @@ public static class DistBuilder
             project.Announcements,
             packs,
             project.OptionPresets);
-        byte[] manifestBytes = ManifestWriter.WriteChecked(manifest, descriptions);
+        byte[] manifestBytes = ManifestWriter.WriteChecked(manifest);
 
         var assets = new MemoryAssets(compiled.Assets);
         var allOperations = compiled.Packs.SelectMany(pack => pack.Operations).ToList();

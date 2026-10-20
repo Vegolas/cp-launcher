@@ -19,6 +19,10 @@ namespace CpLauncher.ViewModels;
 /// </summary>
 public partial class DashboardViewModel : ObservableObject
 {
+    public const string PacksSectionId = "packs";
+    public const string AnnouncementsSectionId = "announcements";
+    public const string PresetsSectionId = "presets";
+
     private readonly LauncherServices _services;
     private readonly Func<Task> _changeClientFolder;
     private readonly IReadOnlyList<string> _startupNotes;
@@ -55,6 +59,9 @@ public partial class DashboardViewModel : ObservableObject
             _restartNotice = StatusTexts.DescribeRestart(restart, services.CurrentVersion, services.Log.Path);
         }
 
+        PacksSection = CreateSection(PacksSectionId);
+        AnnouncementsSection = CreateSection(AnnouncementsSectionId);
+        PresetsSection = CreateSection(PresetsSectionId);
         _manifestSourceText = services.Settings.Current.ManifestSource ?? string.Empty;
         GameExecutableOptions = BuildGameExecutableOptions(services.Settings.Current.GameExecutable);
         _selectedGameExecutable = GameExecutableOptions.First(option => option.RelativePath == services.Settings.Current.GameExecutable);
@@ -77,6 +84,12 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     public ObservableCollection<NoticeViewModel> Banners { get; } = new ObservableCollection<NoticeViewModel>();
+
+    public SectionViewModel PacksSection { get; }
+
+    public SectionViewModel AnnouncementsSection { get; }
+
+    public SectionViewModel PresetsSection { get; }
 
     public ObservableCollection<PackViewModel> Packs { get; } = new ObservableCollection<PackViewModel>();
 
@@ -106,6 +119,15 @@ public partial class DashboardViewModel : ObservableObject
         }
     }
 
+    /// <summary>Icon.utx is not the original and a copy of the original exists ("Przywróć oryginał" is shown).</summary>
+    public bool HasOriginalToRestore
+    {
+        get
+        {
+            return _iconStatus is not null && _iconStatus.HasBackup && _iconStatus.State != PatchFileState.Original;
+        }
+    }
+
     [ObservableProperty]
     private string _manifestVersionText = "–";
 
@@ -114,6 +136,10 @@ public partial class DashboardViewModel : ObservableObject
 
     [ObservableProperty]
     private string _manifestSourceDescription = "–";
+
+    /// <summary>One sentence about the recipes in use, under the status.</summary>
+    [ObservableProperty]
+    private string _manifestSummary = "Sprawdzanie przepisów…";
 
     [ObservableProperty]
     private NoticeViewModel _iconState = new NoticeViewModel(StatusSeverity.Info, "Sprawdzanie…");
@@ -160,6 +186,10 @@ public partial class DashboardViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _settingsMessage;
+
+    /// <summary>The settings screen (launcher settings and technical details) instead of the packs.</summary>
+    [ObservableProperty]
+    private bool _isSettingsOpen;
 
     public Task InitializeAsync()
     {
@@ -257,6 +287,12 @@ public partial class DashboardViewModel : ObservableObject
         LastAction = new NoticeViewModel(StatusSeverity.Success, text);
     }
 
+    [RelayCommand]
+    private void CloseSettings()
+    {
+        IsSettingsOpen = false;
+    }
+
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private async Task ChangeClientFolderAsync()
     {
@@ -338,7 +374,7 @@ public partial class DashboardViewModel : ObservableObject
 
     private bool CanRestoreOriginal()
     {
-        return !IsBusy && _iconStatus is not null && _iconStatus.HasBackup && _iconStatus.State != PatchFileState.Original;
+        return !IsBusy && HasOriginalToRestore;
     }
 
     private bool CanApplyPreset(PresetViewModel? preset)
@@ -349,6 +385,11 @@ public partial class DashboardViewModel : ObservableObject
     private bool CanRestoreMySettings()
     {
         return !IsBusy && HasSettingsBackup;
+    }
+
+    partial void OnIsSettingsOpenChanged(bool value)
+    {
+        SettingsMessage = null;
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -449,15 +490,21 @@ public partial class DashboardViewModel : ObservableObject
         {
             ManifestVersionText = "brak";
             ManifestOriginText = string.Empty;
+            ManifestSummary = "Brak przepisów.";
             PacksEditable = false;
             HasPresets = false;
             HasAnnouncements = false;
+            UpdatePacksSummary();
+            UpdateAnnouncementsSummary();
             return;
         }
 
         Manifest manifest = loaded.Manifest;
         ManifestVersionText = string.IsNullOrEmpty(manifest.Version) ? "nieznana" : manifest.Version;
         ManifestOriginText = loaded.Origin == ManifestOrigin.Source ? "pobrany teraz" : "zapisana kopia";
+        ManifestSummary = loaded.Origin == ManifestOrigin.Source
+            ? $"Przepisy {ManifestVersionText}, pobrane teraz."
+            : $"Przepisy {ManifestVersionText} z zapisanej kopii.";
         if (loaded.Key.IsDevelopment)
         {
             Banners.Add(new NoticeViewModel(StatusSeverity.Warning, "Manifest podpisany kluczem deweloperskim (--dev-public-key) – tylko do testów."));
@@ -482,7 +529,7 @@ public partial class DashboardViewModel : ObservableObject
         if (loaded.Notes.Count > 0)
         {
             int count = loaded.Notes.Count;
-            string text = $"Launcher pominął część przepisów ({count} {Polish.Plural(count, "uwaga", "uwagi", "uwag")}) – szczegóły na dole strony.";
+            string text = $"Launcher pominął część przepisów ({count} {Polish.Plural(count, "uwaga", "uwagi", "uwag")}) – szczegóły w Ustawieniach.";
             if (count == 1)
             {
                 text = $"Launcher pominął część przepisów. {StatusTexts.DescribeNote(loaded.Notes[0])}";
@@ -512,6 +559,8 @@ public partial class DashboardViewModel : ObservableObject
 
         HasPresets = Presets.Count > 0;
         HasAnnouncements = Announcements.Count > 0;
+        UpdatePacksSummary();
+        UpdateAnnouncementsSummary();
     }
 
     /// <summary>
@@ -600,7 +649,7 @@ public partial class DashboardViewModel : ObservableObject
         catch (UpdateException exception)
         {
             downloading = false;
-            FailUpdate("Nie udało się pobrać aktualizacji launchera – spróbuj ponownie później (szczegóły na dole).", exception);
+            FailUpdate("Nie udało się pobrać aktualizacji launchera – spróbuj ponownie później (szczegóły w Ustawieniach).", exception);
             return;
         }
 
@@ -613,7 +662,7 @@ public partial class DashboardViewModel : ObservableObject
         }
         catch (UpdateException exception)
         {
-            FailUpdate("Pobrana wersja launchera nie uruchomiła się – nic nie zmieniono. Spróbuj ponownie (szczegóły na dole).", exception);
+            FailUpdate("Pobrana wersja launchera nie uruchomiła się – nic nie zmieniono. Spróbuj ponownie (szczegóły w Ustawieniach).", exception);
             return;
         }
 
@@ -663,7 +712,7 @@ public partial class DashboardViewModel : ObservableObject
                     Details.Add(item);
                 }
 
-                LastAction = new NoticeViewModel(StatusSeverity.Error, "Brakuje obrazków do wybranych paczek – połącz się z internetem i spróbuj ponownie (szczegóły na dole).");
+                LastAction = new NoticeViewModel(StatusSeverity.Error, "Brakuje obrazków do wybranych paczek – połącz się z internetem i spróbuj ponownie (szczegóły w Ustawieniach).");
                 return;
             }
         }
@@ -754,6 +803,7 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(IconStatus));
+        OnPropertyChanged(nameof(HasOriginalToRestore));
         ApplyCommand.NotifyCanExecuteChanged();
         RestoreOriginalCommand.NotifyCanExecuteChanged();
     }
@@ -836,6 +886,8 @@ public partial class DashboardViewModel : ObservableObject
         {
             preset.IsApplied = ini is not null && !IniMerger.Merge(ini, preset.Preset.Values).HasChanges;
         }
+
+        UpdatePresetsSummary();
     }
 
     private void ShowPresetResult(PresetResult result, string presetName)
@@ -852,7 +904,67 @@ public partial class DashboardViewModel : ObservableObject
 
     private void OnPackSelectionChanged()
     {
+        UpdatePacksSummary();
         _ = RefreshStatusAfterToggleAsync();
+    }
+
+    private SectionViewModel CreateSection(string id)
+    {
+        return new SectionViewModel(id, !_services.Settings.Current.IsCollapsed(id), OnSectionExpandedChanged);
+    }
+
+    private void OnSectionExpandedChanged(SectionViewModel section)
+    {
+        try
+        {
+            _services.Settings.Update(settings => settings.WithCollapsed(section.Id, !section.IsExpanded));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Details.Add($"settings.json: {exception.Message}");
+        }
+    }
+
+    private void UpdatePacksSummary()
+    {
+        if (Packs.Count == 0)
+        {
+            PacksSection.Summary = "Brak paczek";
+            return;
+        }
+
+        int selected = Packs.Count(pack => pack.IsSelected);
+        PacksSection.Summary = $"Wybrano {selected} z {Packs.Count}";
+    }
+
+    private void UpdateAnnouncementsSummary()
+    {
+        if (Announcements.Count == 0)
+        {
+            AnnouncementsSection.Summary = "Brak ogłoszeń";
+            return;
+        }
+
+        AnnouncementsSection.Summary = $"Najnowsze: {Announcements[0].DateText}";
+    }
+
+    private void UpdatePresetsSummary()
+    {
+        List<string> applied = Presets.Where(preset => preset.IsApplied).Select(preset => preset.Name).ToList();
+        if (applied.Count > 0)
+        {
+            PresetsSection.Summary = $"Ustawiony: {string.Join(", ", applied)}";
+            return;
+        }
+
+        int count = Presets.Count;
+        if (count == 0)
+        {
+            PresetsSection.Summary = "Brak presetów";
+            return;
+        }
+
+        PresetsSection.Summary = $"{count} {Polish.Plural(count, "preset", "presety", "presetów")}";
     }
 
     private async Task RefreshStatusAfterToggleAsync()

@@ -21,7 +21,7 @@ public sealed record CompiledPack(RecipePack Recipe, IReadOnlyList<RecipeEntry> 
 
     public Pack ToManifestPack()
     {
-        return new Pack(Recipe.Id, Recipe.Name, Recipe.Default, Operations);
+        return new Pack(Recipe.Id, Recipe.Name, Recipe.Default, Operations, Recipe.Description);
     }
 }
 

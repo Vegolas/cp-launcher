@@ -60,6 +60,13 @@ public partial class App : Application
                 {
                     TimeSpan ready = DateTime.Now - Process.GetCurrentProcess().StartTime;
                     await SmokeRun.CaptureAsync(window, options.SmokeReportPath + ".loaded.png");
+                    if (viewModel.CurrentPage is DashboardViewModel dashboard)
+                    {
+                        dashboard.IsSettingsOpen = true;
+                        await SmokeRun.CaptureAsync(window, options.SmokeReportPath + ".settings.png");
+                        dashboard.IsSettingsOpen = false;
+                    }
+
                     string report = await SmokeRun.RunAsync(viewModel, opened, ready);
                     await SmokeRun.CaptureAsync(window, options.SmokeReportPath + ".done.png");
                     await File.WriteAllTextAsync(options.SmokeReportPath, report);

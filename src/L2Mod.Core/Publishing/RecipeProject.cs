@@ -49,7 +49,7 @@ public sealed record RecipeProject(
 {
     public const string FileName = "recipes.json";
     public const int SupportedFormat = 1;
-    public const int MaxDescriptionLength = 1000;
+    public const int MaxDescriptionLength = ManifestParser.MaxDescriptionLength;
 
     private static readonly string[] RootFields = { "format", "version", "enabled", "launcher", "packs", "announcements", "optionPresets" };
     private static readonly string[] LauncherFields = { "version", "file" };

@@ -8,7 +8,11 @@
         Width="1080" Height="780"
         MinWidth="860" MinHeight="600"
         WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="48"
+        WindowDecorations="Full"
         Background="{StaticResource PageBrush}">
+  <!-- The pages draw their own title bar (Border.titlebar); Windows keeps its caption buttons on the right. -->
   <Window.DataTemplates>
     <DataTemplate DataType="vm:SetupViewModel">
       <views:SetupView />
@@ -19,6 +23,8 @@
   </Window.DataTemplates>
 
   <Panel>
+    <!-- Drag region while no page is shown yet. -->
+    <Border Classes="titlebar" VerticalAlignment="Top" WindowDecorationProperties.ElementRole="TitleBar" />
     <ContentControl Content="{Binding CurrentPage}" />
     <TextBlock Text="Wczytywanie…"
                Classes="muted"

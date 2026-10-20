@@ -70,6 +70,23 @@ public class SettingsTests
         Assert.Equal(@"C:\x", settings.ClientDirectory);
         Assert.Equal(GameExecutables.Default, settings.GameExecutable);
         Assert.NotNull(settings.PackSelection);
+        Assert.Empty(settings.CollapsedSections);
+    }
+
+    [Fact]
+    public void CollapsedSections_RoundTripAndToggle()
+    {
+        var store = new SettingsStore(_fileSystem, SettingsPath);
+        LauncherSettings settings = LauncherSettings.Default.WithCollapsed("packs", true).WithCollapsed("presets", true).WithCollapsed("packs", true);
+
+        store.Save(settings.WithCollapsed("presets", false));
+        LauncherSettings loaded = store.Load().Settings;
+
+        Assert.Equal(new[] { "presets", "packs" }, settings.CollapsedSections);
+        Assert.Equal(new[] { "packs" }, loaded.CollapsedSections);
+        Assert.True(loaded.IsCollapsed("packs"));
+        Assert.False(loaded.IsCollapsed("presets"));
+        Assert.Empty(LauncherSettings.Default.CollapsedSections);
     }
 
     [Fact]

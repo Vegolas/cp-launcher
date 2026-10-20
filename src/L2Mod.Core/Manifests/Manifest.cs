@@ -65,7 +65,8 @@ public sealed record LauncherRelease(string Version, string Url, string Sha256);
 
 public sealed record Announcement(DateOnly Date, string Title, string Text);
 
-public sealed record Pack(string Id, string Name, bool Default, IReadOnlyList<IIconOperation> Operations);
+/// <param name="Description">What the pack changes, in the leader's words (plain text, line breaks allowed); optional.</param>
+public sealed record Pack(string Id, string Name, bool Default, IReadOnlyList<IIconOperation> Operations, string? Description = null);
 
 public sealed record OptionPreset(string Id, string Name, IReadOnlyList<IniValue> Values);
 

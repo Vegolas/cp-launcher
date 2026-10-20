@@ -63,15 +63,24 @@ public class ManifestWriterTests
     }
 
     [Fact]
-    public void Write_AddsPackDescriptionsThatTheParserIgnores()
+    public void Write_PackDescriptionReadsBack()
     {
-        Manifest manifest = CreateManifest(TagPack("tags"));
-        var descriptions = new Dictionary<string, string> { ["tags"] = "Kolorowe narożniki.\nDruga linia." };
+        Manifest manifest = CreateManifest(TagPack("tags") with { Description = "Kolorowe narożniki.\nDruga linia." });
 
-        byte[] json = ManifestWriter.WriteChecked(manifest, descriptions);
+        byte[] json = ManifestWriter.WriteChecked(manifest);
 
         Assert.Contains("\"description\": \"Kolorowe narożniki.\\nDruga linia.\"", Encoding.UTF8.GetString(json));
-        Assert.Empty(ManifestParser.Parse(json).Messages);
+        ManifestReadResult reread = ManifestParser.Parse(json);
+        Assert.Empty(reread.Messages);
+        Assert.Equal("Kolorowe narożniki.\nDruga linia.", reread.Manifest.Packs[0].Description);
+    }
+
+    [Fact]
+    public void WriteChecked_RefusesDescriptionTheLauncherWouldDrop()
+    {
+        Manifest manifest = CreateManifest(TagPack("tags") with { Description = "tab\there" });
+
+        Assert.Throws<ManifestException>(() => ManifestWriter.WriteChecked(manifest));
     }
 
     [Fact]

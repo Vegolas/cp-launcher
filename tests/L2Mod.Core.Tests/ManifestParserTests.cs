@@ -199,6 +199,41 @@ public class ManifestParserTests
     }
 
     [Fact]
+    public void Parse_ReadsPackDescription()
+    {
+        JsonObject root = Example();
+        Pack(root, 1)["description"] = "Czerwony – kontrola.\nFioletowy – obrażenia w czasie.";
+
+        ManifestReadResult result = Parse(root);
+
+        Assert.Empty(result.Messages);
+        Assert.Equal("Czerwony – kontrola.\nFioletowy – obrażenia w czasie.", result.Manifest.Packs[1].Description);
+        Assert.Null(result.Manifest.Packs[0].Description);
+    }
+
+    [Theory]
+    [InlineData("tab\there")]
+    [InlineData("")]
+    [InlineData(1001)]
+    [InlineData(42.0)]
+    public void Parse_DropsBadDescriptionButKeepsThePack(object description)
+    {
+        JsonObject root = Example();
+        Pack(root, 1)["description"] = description switch
+        {
+            int length => JsonValue.Create(new string('x', length)),
+            double number => JsonValue.Create(number),
+            _ => JsonValue.Create((string)description),
+        };
+
+        ManifestReadResult result = Parse(root);
+
+        Assert.Empty(result.Messages);
+        Assert.Equal("debuff-tags", result.Manifest.Packs[1].Id);
+        Assert.Null(result.Manifest.Packs[1].Description);
+    }
+
+    [Fact]
     public void Parse_SkipsPackWithDuplicateId()
     {
         JsonObject root = Example();

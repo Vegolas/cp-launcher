@@ -211,6 +211,43 @@ public class DashboardViewModelTests
     }
 
     [Fact]
+    public async Task Sections_AreExpandedByDefaultAndRememberCollapsing()
+    {
+        DashboardViewModel dashboard = await _fixture.CreateDashboardAsync();
+        Assert.True(dashboard.PacksSection.IsExpanded);
+        Assert.True(dashboard.AnnouncementsSection.IsExpanded);
+        Assert.True(dashboard.PresetsSection.IsExpanded);
+
+        dashboard.AnnouncementsSection.IsExpanded = false;
+        dashboard.PresetsSection.IsExpanded = false;
+        dashboard.PresetsSection.IsExpanded = true;
+
+        var reopened = new DashboardViewModel(_fixture.CreateServices(), () =>
+        {
+            return Task.CompletedTask;
+        }, Array.Empty<string>());
+        Assert.True(reopened.PacksSection.IsExpanded);
+        Assert.False(reopened.AnnouncementsSection.IsExpanded);
+        Assert.True(reopened.PresetsSection.IsExpanded);
+    }
+
+    [Fact]
+    public async Task Sections_SummarizeTheirContentForTheCollapsedHeader()
+    {
+        DashboardViewModel dashboard = await _fixture.CreateDashboardAsync();
+
+        Assert.Equal("Wybrano 2 z 3", dashboard.PacksSection.Summary);
+        Assert.Equal("Najnowsze: 20.10.2026", dashboard.AnnouncementsSection.Summary);
+        Assert.Equal("1 preset", dashboard.PresetsSection.Summary);
+
+        dashboard.Packs[2].IsSelected = true;
+        await dashboard.ApplyPresetCommand.ExecuteAsync(dashboard.Presets[0]);
+
+        Assert.Equal("Wybrano 3 z 3", dashboard.PacksSection.Summary);
+        Assert.Equal("Ustawiony: Masowe PvP", dashboard.PresetsSection.Summary);
+    }
+
+    [Fact]
     public async Task Offline_UsesTheCachedManifestAndSaysSo()
     {
         await _fixture.CreateDashboardAsync();

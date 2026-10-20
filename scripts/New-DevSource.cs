@@ -87,12 +87,16 @@ foreach (string target in new[] { "etc_i.etc_cobol_seed_i01", "etc_i.etc_reaper_
     marks.Add(new OverlayOperation(ClientFiles.IconUtx, target, markPath, markHash, OverlayOperation.DefaultCorner));
 }
 
-var packs = new List<(string Id, string Name, bool Default, IReadOnlyList<IIconOperation> Operations)>
+var packs = new List<(string Id, string Name, string Description, bool Default, IReadOnlyList<IIconOperation> Operations)>
 {
-    ("dance-song-badges", "Znaczki tańców i pieśni", true, MappingOperations.LoadBadges(Path.Combine(mappings, "dances-songs.txt"))),
-    ("chant-badges", "Znaczki czantów i Overlorda", true, MappingOperations.LoadBadges(Path.Combine(mappings, "chants.txt"))),
-    ("debuff-tags", "Tagi debuffów", true, MappingOperations.LoadDebuffTags(Path.Combine(mappings, "debuff-tags.txt"))),
-    ("item-marks-dev", "Oznaczenia przedmiotów (test)", false, marks),
+    ("dance-song-badges", "Znaczki tańców i pieśni", "Ikony tańców i pieśni dostają w prawym dolnym rogu miniaturę buffa o tym samym działaniu.",
+        true, MappingOperations.LoadBadges(Path.Combine(mappings, "dances-songs.txt"))),
+    ("chant-badges", "Znaczki czantów i Overlorda", "Czanty Warcryera i buffy Overlorda dostają w prawym dolnym rogu miniaturę odpowiadającego buffa Propheta.",
+        true, MappingOperations.LoadBadges(Path.Combine(mappings, "chants.txt"))),
+    ("debuff-tags", "Tagi debuffów", "Kolorowy kwadrat w lewym górnym rogu ikony debuffu: czerwony – kontrola (stun, sen, unieruchomienie, strach, cisza), fioletowy – obrażenia w czasie, pomarańczowy – osłabienie statystyk.",
+        true, MappingOperations.LoadDebuffTags(Path.Combine(mappings, "debuff-tags.txt"))),
+    ("item-marks-dev", "Oznaczenia przedmiotów (test)", "Żółty romb na ikonach trzech przedmiotów – paczka tylko do testów launchera.",
+        false, marks),
 };
 
 var assets = new SingleAsset(markPath, markPng);
@@ -180,7 +184,7 @@ static RgbaImage DrawMark()
     return image;
 }
 
-static byte[] WriteManifest(string originalHash, IReadOnlyList<(string Id, string Name, bool Default, IReadOnlyList<IIconOperation> Operations)> packs, LauncherRelease? launcher)
+static byte[] WriteManifest(string originalHash, IReadOnlyList<(string Id, string Name, string Description, bool Default, IReadOnlyList<IIconOperation> Operations)> packs, LauncherRelease? launcher)
 {
     using var stream = new MemoryStream();
     var options = new JsonWriterOptions { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -208,11 +212,12 @@ static byte[] WriteManifest(string originalHash, IReadOnlyList<(string Id, strin
         WriteAnnouncement(writer, "2026-10-18", "Starsze ogłoszenie", "Zwykły tekst, <b>bez HTML</b>.");
         writer.WriteEndArray();
         writer.WriteStartArray("packs");
-        foreach ((string id, string name, bool isDefault, IReadOnlyList<IIconOperation> operations) in packs)
+        foreach ((string id, string name, string description, bool isDefault, IReadOnlyList<IIconOperation> operations) in packs)
         {
             writer.WriteStartObject();
             writer.WriteString("id", id);
             writer.WriteString("name", name);
+            writer.WriteString("description", description);
             writer.WriteBoolean("default", isDefault);
             writer.WriteStartArray("operations");
             foreach (IIconOperation operation in operations)

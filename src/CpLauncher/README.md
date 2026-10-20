@@ -14,7 +14,13 @@ the install state machine and the self-update are L2Mod.Core.
   `UpdateService` per release source, restart info, startup cleanup, hand-off, rollback), `LauncherBuild`
   (running version), `LauncherLog`, game start, bootstrap.
 - `ViewModels/` – `MainWindowViewModel` (setup ↔ dashboard), `SetupViewModel`, `DashboardViewModel`.
-- `Views/` – XAML, `RgbaImageConverter`, dialogs.
+- `Views/` – XAML, `RgbaImageConverter`, dialogs. The look lives in `App.axaml`: colour tokens (L2 Classic slate,
+  CP-bar gold for primary actions, HP red for errors, MP blue for information), Palatino Linotype for headings,
+  icons from the Windows icon font, and the Fluent resource overrides. The window extends into the title bar
+  (`ExtendClientAreaToDecorationsHint`): every page draws its own `Border.titlebar`, Avalonia's drawn
+  decorations keep only minimize/maximize/close. Launcher settings and technical details are a second screen of
+  the dashboard (`IsSettingsOpen`). Paczki, Ogłoszenia and Ustawienia gry are `Expander`s with the `SectionExpander`
+  theme; collapsed ones are remembered in settings.json (`collapsedSections`) and show a one-line summary.
 - `Keys/manifest-public.pem` – the leader's public key (a copy of `keys/signing-public.pem` from `keygen`). It must
   stay identical to that file: `publish` and the Pages workflow refuse a dist the launcher would reject.
 

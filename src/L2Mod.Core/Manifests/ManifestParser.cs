@@ -24,6 +24,7 @@ public static partial class ManifestParser
 {
     public const int SupportedSchema = 1;
     public const string ForbiddenPresetKeyPrefix = "GamePlayViewport";
+    public const int MaxDescriptionLength = 1000;
 
     private const int MaxNameLength = 100;
     private const int MaxTitleLength = 200;
@@ -292,6 +293,7 @@ public static partial class ManifestParser
         RequireObject(item, "a pack");
         string id = ReadId(item);
         string name = GetRequiredText(item, "name", MaxNameLength, false);
+        string? description = ReadDescription(item);
         bool isDefault = GetOptionalBool(item, "default", false);
         JsonElement operationsElement = GetRequiredProperty(item, "operations");
         RequireArray(operationsElement, "operations");
@@ -321,7 +323,30 @@ public static partial class ManifestParser
             }
         }
 
-        return new Pack(id, name, isDefault, operations);
+        return new Pack(id, name, isDefault, operations, description);
+    }
+
+    /// <summary>
+    /// The optional pack description. It only explains the pack, so a bad one is dropped instead of the pack;
+    /// the leader tool's read-back check (<c>ManifestWriter.WriteChecked</c>) refuses to publish it anyway.
+    /// </summary>
+    private static string? ReadDescription(JsonElement item)
+    {
+        string? text = TryGetString(item, "description");
+        if (string.IsNullOrEmpty(text) || text.Length > MaxDescriptionLength)
+        {
+            return null;
+        }
+
+        foreach (char c in text)
+        {
+            if (char.IsControl(c) && c != '\n')
+            {
+                return null;
+            }
+        }
+
+        return text;
     }
 
     private static IIconOperation ReadOperation(JsonElement element)

@@ -125,7 +125,7 @@ public static class SmokeRun
             window.UpdateLayout();
         }, DispatcherPriority.Background);
         Render(window, path);
-        ScrollViewer? scroll = window.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        ScrollViewer? scroll = window.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(viewer => viewer.IsEffectivelyVisible);
         if (scroll?.Content is Control content)
         {
             Render(content, Path.ChangeExtension(path, ".content.png"));

@@ -25,6 +25,9 @@ public sealed record LauncherSettings
     /// <summary>A launcher version not to offer again on this computer: its install failed or it was rolled back.</summary>
     public string? SkippedLauncherVersion { get; init; }
 
+    /// <summary>Ids of the dashboard sections the member collapsed; every other section is expanded.</summary>
+    public string[] CollapsedSections { get; init; } = Array.Empty<string>();
+
     [JsonIgnore]
     public LauncherVersion? SkippedVersion
     {
@@ -86,6 +89,22 @@ public sealed record LauncherSettings
         return pack.Default;
     }
 
+    public bool IsCollapsed(string sectionId)
+    {
+        return CollapsedSections.Contains(sectionId, StringComparer.Ordinal);
+    }
+
+    public LauncherSettings WithCollapsed(string sectionId, bool collapsed)
+    {
+        IEnumerable<string> others = CollapsedSections.Where(id => !string.Equals(id, sectionId, StringComparison.Ordinal));
+        if (collapsed)
+        {
+            others = others.Append(sectionId);
+        }
+
+        return this with { CollapsedSections = others.ToArray() };
+    }
+
     /// <summary>Records the choice for every pack of the manifest; choices for packs no longer listed are kept.</summary>
     public LauncherSettings WithSelection(Manifest manifest, IReadOnlyCollection<string> selectedPackIds)
     {
@@ -143,12 +162,13 @@ public sealed class SettingsStore
                 return new SettingsLoadResult(LauncherSettings.Default, "Plik ustawień był pusty; przywrócono ustawienia domyślne.");
             }
 
-            if (settings.PackSelection is null || string.IsNullOrWhiteSpace(settings.GameExecutable))
+            if (settings.PackSelection is null || string.IsNullOrWhiteSpace(settings.GameExecutable) || settings.CollapsedSections is null)
             {
                 settings = settings with
                 {
                     PackSelection = settings.PackSelection ?? new Dictionary<string, bool>(StringComparer.Ordinal),
                     GameExecutable = string.IsNullOrWhiteSpace(settings.GameExecutable) ? GameExecutables.Default : settings.GameExecutable,
+                    CollapsedSections = settings.CollapsedSections ?? Array.Empty<string>(),
                 };
             }
 

@@ -45,6 +45,33 @@ public sealed class NoticeViewModel
     }
 }
 
+/// <summary>A collapsible dashboard section; whether it is expanded is remembered in settings.json.</summary>
+public partial class SectionViewModel : ObservableObject
+{
+    private readonly Action<SectionViewModel> _expandedChanged;
+
+    public SectionViewModel(string id, bool isExpanded, Action<SectionViewModel> expandedChanged)
+    {
+        Id = id;
+        _isExpanded = isExpanded;
+        _expandedChanged = expandedChanged;
+    }
+
+    public string Id { get; }
+
+    [ObservableProperty]
+    private bool _isExpanded;
+
+    /// <summary>What the header says about the content while the section is collapsed.</summary>
+    [ObservableProperty]
+    private string? _summary;
+
+    partial void OnIsExpandedChanged(bool value)
+    {
+        _expandedChanged(this);
+    }
+}
+
 public sealed class ThumbnailViewModel
 {
     public ThumbnailViewModel(string target, RgbaImage image)
@@ -84,6 +111,15 @@ public partial class PackViewModel : ObservableObject
         get
         {
             return Pack.Name;
+        }
+    }
+
+    /// <summary>The leader's description of the pack (plain text), or null.</summary>
+    public string? Description
+    {
+        get
+        {
+            return Pack.Description;
         }
     }
 

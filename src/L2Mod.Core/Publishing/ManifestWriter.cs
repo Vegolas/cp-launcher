@@ -22,11 +22,11 @@ public static class ManifestWriter
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    /// <param name="packDescriptions">
-    /// Optional "description" per pack id. Schema 1 launchers ignore unknown pack fields, so it is safe to publish;
-    /// <see cref="Pack"/> has no such property yet.
-    /// </param>
-    public static byte[] Write(Manifest manifest, IReadOnlyDictionary<string, string>? packDescriptions = null)
+    /// <remarks>
+    /// A pack's <see cref="Pack.Description"/> is written as "description". Launchers that predate it ignore unknown
+    /// pack fields, so it is safe to publish to them.
+    /// </remarks>
+    public static byte[] Write(Manifest manifest)
     {
         if (manifest.Schema != ManifestParser.SupportedSchema)
         {
@@ -47,7 +47,7 @@ public static class ManifestWriter
 
             WriteSupportedOriginals(writer, manifest.SupportedOriginals);
             WriteAnnouncements(writer, manifest.Announcements);
-            WritePacks(writer, manifest.Packs, packDescriptions);
+            WritePacks(writer, manifest.Packs);
             WritePresets(writer, manifest.OptionPresets);
             writer.WriteEndObject();
         }
@@ -60,16 +60,16 @@ public static class ManifestWriter
     /// Writes the manifest and reads it back with <see cref="ManifestParser"/>. Throws when the launcher would
     /// skip anything (a pack, preset or announcement) or would not read back exactly what was written.
     /// </summary>
-    public static byte[] WriteChecked(Manifest manifest, IReadOnlyDictionary<string, string>? packDescriptions = null)
+    public static byte[] WriteChecked(Manifest manifest)
     {
-        byte[] json = Write(manifest, packDescriptions);
+        byte[] json = Write(manifest);
         ManifestReadResult result = ManifestParser.Parse(json);
         if (result.Messages.Count > 0)
         {
             throw new ManifestException("The launcher would not use the whole manifest: " + string.Join(" ", result.Messages));
         }
 
-        byte[] reread = Write(result.Manifest, packDescriptions);
+        byte[] reread = Write(result.Manifest);
         if (!reread.AsSpan().SequenceEqual(json))
         {
             throw new ManifestException("The manifest does not read back as written (check letter case of hashes and names).");
@@ -119,7 +119,7 @@ public static class ManifestWriter
         writer.WriteEndArray();
     }
 
-    private static void WritePacks(Utf8JsonWriter writer, IReadOnlyList<Pack> packs, IReadOnlyDictionary<string, string>? descriptions)
+    private static void WritePacks(Utf8JsonWriter writer, IReadOnlyList<Pack> packs)
     {
         writer.WriteStartArray("packs");
         foreach (Pack pack in packs)
@@ -127,9 +127,9 @@ public static class ManifestWriter
             writer.WriteStartObject();
             writer.WriteString("id", pack.Id);
             writer.WriteString("name", pack.Name);
-            if (descriptions is not null && descriptions.TryGetValue(pack.Id, out string? description))
+            if (pack.Description is not null)
             {
-                writer.WriteString("description", description);
+                writer.WriteString("description", pack.Description);
             }
 
             writer.WriteBoolean("default", pack.Default);
