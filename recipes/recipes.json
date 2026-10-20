@@ -1,7 +1,8 @@
 {
   "format": 1,
-  "version": "2026.10.19.2",
+  "version": "2026.10.20.1",
   "enabled": true,
+  "launcher": { "version": "1.1.0", "file": "../work/releases/1.1.0/CpLauncher.exe" },
   "packs": [
     {
       "id": "dance-song-badges",

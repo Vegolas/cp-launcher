@@ -82,7 +82,7 @@ public class ClientAndGameTests
     [Fact]
     public void LauncherBuild_IsTheProjectVersion()
     {
-        Assert.Equal(LauncherVersion.Parse("1.0.0"), LauncherBuild.CurrentVersion);
+        Assert.Equal(LauncherVersion.Parse("1.1.0"), LauncherBuild.CurrentVersion);
     }
 
     [Fact]
