@@ -4,12 +4,12 @@
         xmlns:views="clr-namespace:CpLauncher.Views"
         x:Class="CpLauncher.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="CP Launcher"
+        Title="Veggie launcher"
         Width="1080" Height="780"
         MinWidth="860" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="48"
+        ExtendClientAreaTitleBarHeightHint="56"
         WindowDecorations="Full"
         Background="{StaticResource PageBrush}">
   <!-- The pages draw their own title bar (Border.titlebar); Windows keeps its caption buttons on the right. -->

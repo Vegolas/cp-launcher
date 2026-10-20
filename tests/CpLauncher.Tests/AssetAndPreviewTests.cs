@@ -138,4 +138,25 @@ public class AssetAndPreviewTests
             Assert.Empty(pack.Thumbnails);
         });
     }
+
+    [Fact]
+    public void PackPreview_CountsTheIconsBeyondTheStripAndNotesOnlyTheFailedOnes()
+    {
+        IIconOperation[] operations = Enumerable.Range(0, 22)
+            .Select(index => (IIconOperation)new TagOperation("Icon.utx", $"icon.skill{index}", new Rgb(255, 0, 0), 8, IconCorner.TopLeft))
+            .ToArray();
+        var pack = new CpLauncher.ViewModels.PackViewModel(new Pack("tags", "Tagi", true, operations), true, () =>
+        {
+        });
+        PreviewIcon[] shown = Enumerable.Range(0, PackPreviewRenderer.MaxIconsPerPack)
+            .Select(index => new PreviewIcon($"icon.skill{index}", new RgbaImage(32, 32)))
+            .ToArray();
+
+        pack.SetPreview(new PackPreview("tags", shown, 2));
+        Assert.Equal("+14", pack.OverflowText);
+        Assert.Equal("2 bez podglądu (brak ikony w Twoim Icon.utx lub obrazka)", pack.PreviewNote);
+
+        pack.SetPreview(new PackPreview("tags", shown, 16));
+        Assert.Null(pack.OverflowText);
+    }
 }

@@ -143,6 +143,10 @@ public partial class PackViewModel : ObservableObject
     [ObservableProperty]
     private string? _previewNote;
 
+    /// <summary>"+16": the icons of the pack beyond the preview strip, shown as the strip's last slot; null when none.</summary>
+    [ObservableProperty]
+    private string? _overflowText;
+
     public void SetPreview(PackPreview preview)
     {
         Thumbnails.Clear();
@@ -153,18 +157,8 @@ public partial class PackViewModel : ObservableObject
 
         int targets = Pack.Operations.Select(operation => operation.Target).Distinct(StringComparer.OrdinalIgnoreCase).Count();
         int hidden = targets - preview.Icons.Count - preview.Failed;
-        var notes = new List<string>();
-        if (hidden > 0)
-        {
-            notes.Add($"+ {hidden} {Polish.Plural(hidden, "inna", "inne", "innych")}");
-        }
-
-        if (preview.Failed > 0)
-        {
-            notes.Add($"{preview.Failed} bez podglądu (brak ikony w Twoim Icon.utx lub obrazka)");
-        }
-
-        PreviewNote = notes.Count == 0 ? null : string.Join(" · ", notes);
+        OverflowText = hidden > 0 ? $"+{hidden}" : null;
+        PreviewNote = preview.Failed > 0 ? $"{preview.Failed} bez podglądu (brak ikony w Twoim Icon.utx lub obrazka)" : null;
     }
 
     partial void OnIsSelectedChanged(bool value)

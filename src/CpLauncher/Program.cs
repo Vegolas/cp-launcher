@@ -6,7 +6,7 @@ namespace CpLauncher;
 
 internal static class Program
 {
-    private const string Caption = "CP Launcher";
+    private const string Caption = "Veggie launcher";
 
     /// <summary>
     /// The order matters. The single-instance lock comes first: a launcher started by another one (update,
@@ -33,7 +33,7 @@ internal static class Program
             log.Write("Another launcher is running; this one exits.");
             if (!startup.IsHandOff)
             {
-                NativeMessages.ShowInformation(Caption, "CP Launcher już działa – jego okno znajdziesz na pasku zadań.");
+                NativeMessages.ShowInformation(Caption, "Veggie launcher już działa – jego okno znajdziesz na pasku zadań.");
             }
 
             return 1;

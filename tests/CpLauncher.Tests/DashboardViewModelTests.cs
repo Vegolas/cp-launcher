@@ -48,14 +48,22 @@ public class DashboardViewModelTests
     public async Task Apply_InstallsTheSelectedPacksAndRemembersTheChoice()
     {
         DashboardViewModel dashboard = await _fixture.CreateDashboardAsync();
+        int installed = 0;
+        dashboard.ChangesInstalled += (_, _) =>
+        {
+            installed++;
+        };
+        Assert.True(dashboard.HasPendingChanges);
 
         await dashboard.ApplyCommand.ExecuteAsync(null);
 
+        Assert.Equal(1, installed);
         Assert.Equal(StatusSeverity.Success, dashboard.LastAction?.Severity);
         Assert.Equal("Zainstalowano zmiany (2 ikony).", dashboard.LastAction?.Text);
         Assert.Equal(PatchFileState.OurPatch, dashboard.IconStatus?.State);
         Assert.Equal(PendingAction.None, dashboard.IconStatus?.Pending);
         Assert.Equal("Zmiany są aktualne.", dashboard.PendingText);
+        Assert.False(dashboard.HasPendingChanges);
         Assert.NotEqual(_fixture.Original, _fixture.ReadIcon());
         Assert.Equal(_fixture.Original, _fixture.FileSystem.ReadAllBytes(_fixture.InstallerOptions.GetBackupPath(ClientFiles.IconUtx, _fixture.OriginalHash)));
         LauncherSettings saved = new SettingsStore(_fixture.FileSystem, _fixture.Paths.SettingsPath).Load().Settings;
@@ -98,10 +106,16 @@ public class DashboardViewModelTests
         {
             return dashboard.IconStatus?.Pending == PendingAction.Restore;
         });
+        int installed = 0;
+        dashboard.ChangesInstalled += (_, _) =>
+        {
+            installed++;
+        };
         await dashboard.ApplyCommand.ExecuteAsync(null);
 
         Assert.Equal("Przywrócono oryginalny Icon.utx.", dashboard.LastAction?.Text);
         Assert.Equal(_fixture.Original, _fixture.ReadIcon());
+        Assert.Equal(0, installed);
     }
 
     [Fact]

@@ -15,8 +15,8 @@
     <!-- LibraryImport (source-generated P/Invoke) for the Win32 message box. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Version>1.0.0</Version>
-    <Product>CP Launcher</Product>
-    <AssemblyTitle>CP Launcher</AssemblyTitle>
+    <Product>Veggie launcher</Product>
+    <AssemblyTitle>Veggie launcher</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,6 +37,14 @@
   <PropertyGroup Condition="'$(CpLauncherSimulateStartupFailure)' == 'true'">
     <DefineConstants>$(DefineConstants);CPLAUNCHER_SIMULATE_STARTUP_FAILURE</DefineConstants>
   </PropertyGroup>
+
+  <!--
+    Character and background art (Views/Art.cs). Optional: a build without the files has no pictures but works the
+    same, so the folder can be kept out of git.
+  -->
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\Art\**" />
+  </ItemGroup>
 
   <!-- The public half of the leader's signing key; see Services/TrustedKeys.cs. -->
   <ItemGroup>

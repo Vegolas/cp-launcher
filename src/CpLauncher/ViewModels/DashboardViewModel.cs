@@ -67,6 +67,9 @@ public partial class DashboardViewModel : ObservableObject
         _selectedGameExecutable = GameExecutableOptions.First(option => option.RelativePath == services.Settings.Current.GameExecutable);
     }
 
+    /// <summary>Raised after "Zastosuj" installed or rebuilt the changes in Icon.utx (the view animates the packs).</summary>
+    public event EventHandler? ChangesInstalled;
+
     public string ClientDirectory
     {
         get
@@ -116,6 +119,15 @@ public partial class DashboardViewModel : ObservableObject
         get
         {
             return _iconStatus;
+        }
+    }
+
+    /// <summary>"Zastosuj" would change Icon.utx (install, rebuild or restore); false when the changes are up to date.</summary>
+    public bool HasPendingChanges
+    {
+        get
+        {
+            return _iconStatus is not null && _iconStatus.Pending != PendingAction.None;
         }
     }
 
@@ -740,6 +752,10 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         await RefreshStatusAsync();
+        if (result.Outcome is PatchOutcome.Installed or PatchOutcome.Rebuilt)
+        {
+            ChangesInstalled?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private async Task RestoreCoreAsync()
@@ -804,6 +820,7 @@ public partial class DashboardViewModel : ObservableObject
 
         OnPropertyChanged(nameof(IconStatus));
         OnPropertyChanged(nameof(HasOriginalToRestore));
+        OnPropertyChanged(nameof(HasPendingChanges));
         ApplyCommand.NotifyCanExecuteChanged();
         RestoreOriginalCommand.NotifyCanExecuteChanged();
     }

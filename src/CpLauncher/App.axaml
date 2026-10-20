@@ -3,37 +3,50 @@
              x:Class="CpLauncher.App"
              RequestedThemeVariant="Dark">
   <!--
-    Visual language: the slate panels of the L2 Classic interface. The accent is the CP bar's gold (primary
-    actions, selection, focus); HP red marks errors, MP blue information. Palatino Linotype (ships with Windows)
-    sets headings, Segoe UI the rest. Icons come from the Windows icon font (Segoe Fluent Icons on Windows 11,
-    Segoe MDL2 Assets on Windows 10).
+    Visual language: the slate windows of the L2 Classic interface, framed like game panels (gold hairline, black
+    outer ring, darker header strip with a gold diamond). The accent is the CP bar's gold: the filled gold gradient
+    belongs to "Uruchom L2Dex" (and "Dalej" on the first page), outlined gold to the action a page asks for. HP red
+    marks errors, MP blue information. Palatino Linotype (ships with Windows) sets headings, small headings in
+    spaced capitals; Segoe UI the rest. Icons come from the Windows icon font (Segoe Fluent Icons on Windows 11,
+    Segoe MDL2 Assets on Windows 10). Pictures are in Assets/Art (Views/Art.cs).
   -->
   <Application.Resources>
-    <Color x:Key="NightColor">#131820</Color>
+    <Color x:Key="NightColor">#0E1218</Color>
+    <Color x:Key="HeroColor">#07090C</Color>
+    <Color x:Key="DialogColor">#0C0F14</Color>
     <Color x:Key="PanelColor">#1A2029</Color>
-    <Color x:Key="SlotColor">#0C1015</Color>
-    <Color x:Key="LineColor">#29313D</Color>
+    <Color x:Key="SlotColor">#07090C</Color>
+    <Color x:Key="LineColor">#232A34</Color>
     <Color x:Key="LineStrongColor">#3A4555</Color>
     <Color x:Key="TextColor">#ECE6DA</Color>
-    <Color x:Key="MutedColor">#97A1AF</Color>
+    <Color x:Key="ProseColor">#D8D2C6</Color>
+    <Color x:Key="MutedColor">#9AA4B2</Color>
     <Color x:Key="FaintColor">#68727F</Color>
     <Color x:Key="GoldColor">#D9A93F</Color>
+    <Color x:Key="GoldLightColor">#E9CF8E</Color>
     <Color x:Key="GoldHoverColor">#E8BA52</Color>
     <Color x:Key="GoldPressedColor">#C2932F</Color>
+    <Color x:Key="GoldRimColor">#6E5420</Color>
     <Color x:Key="OnGoldColor">#1B1408</Color>
     <Color x:Key="HpColor">#D0574B</Color>
     <Color x:Key="MpColor">#5B95D6</Color>
     <Color x:Key="SuccessColor">#67B07A</Color>
 
     <SolidColorBrush x:Key="PageBrush" Color="{StaticResource NightColor}" />
+    <SolidColorBrush x:Key="HeroBrush" Color="{StaticResource HeroColor}" />
+    <SolidColorBrush x:Key="DialogBrush" Color="{StaticResource DialogColor}" />
     <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
     <SolidColorBrush x:Key="SlotBrush" Color="{StaticResource SlotColor}" />
     <SolidColorBrush x:Key="LineBrush" Color="{StaticResource LineColor}" />
     <SolidColorBrush x:Key="LineStrongBrush" Color="{StaticResource LineStrongColor}" />
     <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
+    <SolidColorBrush x:Key="ProseBrush" Color="{StaticResource ProseColor}" />
     <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource MutedColor}" />
     <SolidColorBrush x:Key="FaintBrush" Color="{StaticResource FaintColor}" />
     <SolidColorBrush x:Key="GoldBrush" Color="{StaticResource GoldColor}" />
+    <SolidColorBrush x:Key="GoldLightBrush" Color="{StaticResource GoldLightColor}" />
+    <SolidColorBrush x:Key="GoldRimBrush" Color="{StaticResource GoldRimColor}" />
+    <SolidColorBrush x:Key="OnGoldBrush" Color="{StaticResource OnGoldColor}" />
     <SolidColorBrush x:Key="HpBrush" Color="{StaticResource HpColor}" />
     <SolidColorBrush x:Key="MpBrush" Color="{StaticResource MpColor}" />
     <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
@@ -41,6 +54,57 @@
     <SolidColorBrush x:Key="SuccessTintBrush" Color="#18291F" />
     <SolidColorBrush x:Key="WarningTintBrush" Color="#2E2614" />
     <SolidColorBrush x:Key="ErrorTintBrush" Color="#311A1A" />
+    <!-- Gold hairlines: dialog frame (34 %), panel frame (22 %), header strip bottom (25 %). -->
+    <SolidColorBrush x:Key="GoldLineBrush" Color="#57D9A93F" />
+    <SolidColorBrush x:Key="GoldHairlineBrush" Color="#38D9A93F" />
+    <SolidColorBrush x:Key="GoldHeaderLineBrush" Color="#40D9A93F" />
+
+    <LinearGradientBrush x:Key="TitleBarGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Offset="0" Color="#1A2029" />
+      <GradientStop Offset="1" Color="#11151B" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PanelGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Offset="0" Color="#1A2029" />
+      <GradientStop Offset="1" Color="#151A21" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="HeaderGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Offset="0" Color="#1A1F27" />
+      <GradientStop Offset="1" Color="#12161C" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="HeaderHoverGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Offset="0" Color="#212833" />
+      <GradientStop Offset="1" Color="#171C24" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="GoldGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Offset="0" Color="#F2CB66" />
+      <GradientStop Offset="0.5" Color="#D9A93F" />
+      <GradientStop Offset="1" Color="#B98B2B" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="GoldHoverGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Offset="0" Color="#F7D67D" />
+      <GradientStop Offset="0.5" Color="#E6B74C" />
+      <GradientStop Offset="1" Color="#C69730" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="GoldPressedGradient" StartPoint="0%,0%" EndPoint="0%,100%">
+      <GradientStop Offset="0" Color="#D9B04F" />
+      <GradientStop Offset="0.5" Color="#C2932F" />
+      <GradientStop Offset="1" Color="#A47A22" />
+    </LinearGradientBrush>
+    <!-- A thin gold line that fades out at both ends (hero floor, dividers). -->
+    <LinearGradientBrush x:Key="GoldFadeLine" StartPoint="0%,0%" EndPoint="100%,0%">
+      <GradientStop Offset="0" Color="#00D9A93F" />
+      <GradientStop Offset="0.22" Color="#8CD9A93F" />
+      <GradientStop Offset="0.78" Color="#8CD9A93F" />
+      <GradientStop Offset="1" Color="#00D9A93F" />
+    </LinearGradientBrush>
+    <RadialGradientBrush x:Key="GroundShadow">
+      <GradientStop Offset="0" Color="#C0000000" />
+      <GradientStop Offset="1" Color="#00000000" />
+    </RadialGradientBrush>
+    <RadialGradientBrush x:Key="GemGlow">
+      <GradientStop Offset="0" Color="#F2FFE2A0" />
+      <GradientStop Offset="1" Color="#00FFE2A0" />
+    </RadialGradientBrush>
 
     <FontFamily x:Key="DisplayFont">Palatino Linotype, Georgia</FontFamily>
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
@@ -78,28 +142,32 @@
     <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="{StaticResource OnGoldColor}" />
     <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="{StaticResource OnGoldColor}" />
     <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="{StaticResource OnGoldColor}" />
-    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#6A7584" />
-    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#8C97A6" />
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#8A6A2E" />
+    <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#B08A3E" />
 
     <SolidColorBrush x:Key="TextControlBackground" Color="{StaticResource SlotColor}" />
     <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="{StaticResource SlotColor}" />
     <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{StaticResource SlotColor}" />
     <SolidColorBrush x:Key="TextControlBorderBrush" Color="#323C4A" />
     <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#45515F" />
+    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{StaticResource GoldColor}" />
     <SolidColorBrush x:Key="ComboBoxBackground" Color="{StaticResource SlotColor}" />
-    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#121821" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#0E1218" />
     <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#323C4A" />
 
     <!--
-      A collapsible dashboard section: a panel whose whole header row toggles it. The heading lines up with the
-      content; the chevron sits on the right (down when collapsed, up when expanded). The Header carries the
-      heading and, while collapsed, a short summary.
+      A collapsible dashboard section: a framed panel whose header strip toggles it. The strip carries a gold
+      diamond, the heading (spaced capitals) and, while collapsed, a short summary; the chevron sits on the right
+      (down when collapsed, up when expanded).
     -->
     <ControlTheme x:Key="SectionHeaderToggle" TargetType="ToggleButton">
-      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Background" Value="{StaticResource HeaderGradient}" />
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-      <Setter Property="Padding" Value="20,16" />
-      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldHeaderLineBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="14,0,12,0" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="CornerRadius" Value="3" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="Cursor" Value="Hand" />
@@ -108,28 +176,34 @@
           <Border Name="PART_Root"
                   Background="{TemplateBinding Background}"
                   CornerRadius="{TemplateBinding CornerRadius}"
-                  BorderBrush="Transparent"
-                  BorderThickness="1"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
                   Padding="{TemplateBinding Padding}">
-            <ContentPresenter Content="{TemplateBinding Content}"
-                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            <Grid ColumnDefinitions="Auto,*">
+              <Path Classes="diamond" Margin="0,0,10,0" VerticalAlignment="Center" />
+              <ContentPresenter Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </Grid>
           </Border>
         </ControlTemplate>
       </Setter>
       <Style Selector="^:pointerover /template/ Border#PART_Root">
-        <Setter Property="Background" Value="#1F2631" />
+        <Setter Property="Background" Value="{StaticResource HeaderHoverGradient}" />
       </Style>
       <Style Selector="^:focus-visible /template/ Border#PART_Root">
         <Setter Property="BorderBrush" Value="{StaticResource GoldBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
       </Style>
     </ControlTheme>
 
     <ControlTheme x:Key="SectionExpander" TargetType="Expander">
-      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="Background" Value="{StaticResource PanelGradient}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldHairlineBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="3" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="VerticalAlignment" Value="Top" />
       <Setter Property="Template">
@@ -137,7 +211,8 @@
           <Border Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="{TemplateBinding CornerRadius}">
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  BoxShadow="0 0 0 1 #05070A, 0 6 18 0 #59000000">
             <StackPanel>
               <ToggleButton Name="PART_Toggle"
                             Theme="{StaticResource SectionHeaderToggle}"
@@ -162,7 +237,7 @@
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}"
                                 IsVisible="{TemplateBinding IsExpanded}"
-                                Margin="20,0,20,18" />
+                                Margin="16,12,16,16" />
             </StackPanel>
           </Border>
         </ControlTemplate>
@@ -171,35 +246,152 @@
         <Setter Property="RenderTransform" Value="rotate(180deg)" />
       </Style>
       <Style Selector="^:expanded /template/ ToggleButton#PART_Toggle">
-        <Setter Property="CornerRadius" Value="5,5,0,0" />
-        <Setter Property="Padding" Value="20,16,20,10" />
+        <Setter Property="CornerRadius" Value="3,3,0,0" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
       </Style>
       <Style Selector="^ /template/ ToggleButton#PART_Toggle:pointerover TextBlock#PART_Chevron">
         <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
       </Style>
+    </ControlTheme>
+
+    <!--
+      The CP guide's speech box: a dark window with a gold frame, corner brackets, a header strip with the state
+      gem and a pointer towards the character on its left. The gem follows the classes info (default), success,
+      warning, pending (wins over the file state) and error. "pointer-low" moves the pointer down for a tall
+      character. The view finds PART_Gem / PART_Glow to flash them when the state changes.
+    -->
+    <ControlTheme x:Key="GuideDialog" TargetType="HeaderedContentControl">
+      <Setter Property="Background" Value="{StaticResource DialogBrush}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Background="{TemplateBinding Background}"
+                    BorderBrush="{StaticResource GoldLineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="2"
+                    BoxShadow="0 0 0 1 #000000, 0 12 30 0 #8C000000">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Height="34" Padding="14,0" CornerRadius="2,2,0,0"
+                        Background="{StaticResource HeaderGradient}"
+                        BorderBrush="{StaticResource GoldHeaderLineBrush}" BorderThickness="0,0,0,1">
+                  <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                    <Panel Width="12" Height="12" VerticalAlignment="Center">
+                      <Ellipse Name="PART_Glow" Width="30" Height="30" Margin="-9" Opacity="0"
+                               Fill="{StaticResource GemGlow}" IsHitTestVisible="False" />
+                      <Path Name="PART_Gem" Classes="gem" RenderTransformOrigin="50%,50%">
+                        <Path.RenderTransform>
+                          <ScaleTransform />
+                        </Path.RenderTransform>
+                      </Path>
+                    </Panel>
+                    <TextBlock Classes="caps" FontSize="12" Text="PRZEWODNIK CP" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Border>
+                <ContentPresenter Content="{TemplateBinding Content}"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Padding="{TemplateBinding Padding}" />
+              </DockPanel>
+            </Border>
+            <Border Name="PART_Pointer" Width="13" Height="13" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Margin="-7,56,0,0" Background="{TemplateBinding Background}"
+                    BorderBrush="{StaticResource GoldLineBrush}" BorderThickness="1,0,0,1"
+                    RenderTransform="rotate(45deg)" />
+            <Border Classes="corner" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-3,-3,0,0" BorderThickness="2,2,0,0" />
+            <Border Classes="corner" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,-3,0" BorderThickness="0,2,2,0" />
+            <Border Classes="corner" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-3,0,0,-3" BorderThickness="2,0,0,2" />
+            <Border Classes="corner" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-3,-3" BorderThickness="0,0,2,2" />
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^.pointer-low /template/ Border#PART_Pointer">
+        <Setter Property="Margin" Value="-7,150,0,0" />
+      </Style>
+      <!-- The gem's colours live here, not in Path.gem: a style in Application.Styles would beat these selectors. -->
+      <Style Selector="^ /template/ Path#PART_Gem">
+        <Setter Property="Fill" Value="{StaticResource MpBrush}" />
+      </Style>
+      <Style Selector="^.success /template/ Path#PART_Gem">
+        <Setter Property="Fill" Value="{StaticResource SuccessBrush}" />
+      </Style>
+      <Style Selector="^.warning /template/ Path#PART_Gem, ^.pending /template/ Path#PART_Gem">
+        <Setter Property="Fill" Value="{StaticResource GoldBrush}" />
+      </Style>
+      <Style Selector="^.error /template/ Path#PART_Gem">
+        <Setter Property="Fill" Value="{StaticResource HpBrush}" />
+      </Style>
+    </ControlTheme>
+
+    <!-- A divider inside a panel: two gold hairlines fading out from a small diamond. -->
+    <ControlTheme x:Key="Ornament" TargetType="Separator">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid ColumnDefinitions="*,Auto,*" Height="8">
+            <Border Height="1" VerticalAlignment="Center">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                  <GradientStop Offset="0" Color="#00D9A93F" />
+                  <GradientStop Offset="1" Color="#59D9A93F" />
+                </LinearGradientBrush>
+              </Border.Background>
+            </Border>
+            <Border Grid.Column="1" Width="6" Height="6" Margin="10,0" Background="{StaticResource GoldBrush}"
+                    RenderTransform="rotate(45deg)" />
+            <Border Grid.Column="2" Height="1" VerticalAlignment="Center">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                  <GradientStop Offset="0" Color="#59D9A93F" />
+                  <GradientStop Offset="1" Color="#00D9A93F" />
+                </LinearGradientBrush>
+              </Border.Background>
+            </Border>
+          </Grid>
+        </ControlTemplate>
+      </Setter>
     </ControlTheme>
   </Application.Resources>
 
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
-        <ColorPaletteResources x:Key="Dark" Accent="#D9A93F" RegionColor="#131820" BaseHigh="#ECE6DA" />
+        <ColorPaletteResources x:Key="Dark" Accent="#D9A93F" RegionColor="#0E1218" BaseHigh="#ECE6DA" />
       </FluentTheme.Palettes>
     </FluentTheme>
 
-    <!-- Type scale (12 / 14 / 18 / 21 / 24); headings in Palatino, regular weight. -->
+    <!-- Type scale (12 / 14 / 18 / 21 / 24); headings in Palatino, regular weight; "caps" for panel headings. -->
     <Style Selector="TextBlock.display">
       <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
-      <Setter Property="FontSize" Value="24" />
+      <Setter Property="FontSize" Value="26" />
     </Style>
     <Style Selector="TextBlock.headline">
       <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
-      <Setter Property="FontSize" Value="21" />
+      <Setter Property="FontSize" Value="19" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.heading">
       <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
       <Setter Property="FontSize" Value="18" />
+    </Style>
+    <Style Selector="TextBlock.caps">
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="2" />
+      <Setter Property="Foreground" Value="{StaticResource GoldLightBrush}" />
+    </Style>
+    <Style Selector="TextBlock.brand">
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="LetterSpacing" Value="2.4" />
+      <Setter Property="Foreground" Value="{StaticResource GoldLightBrush}" />
+    </Style>
+    <Style Selector="TextBlock.page-title">
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="LetterSpacing" Value="3" />
+      <Setter Property="Foreground" Value="{StaticResource GoldLightBrush}" />
     </Style>
     <Style Selector="TextBlock.strong">
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -232,54 +424,74 @@
       <Setter Property="IsVisible" Value="False" />
     </Style>
 
-    <!-- The custom title bar (drag region) at the top of every page. -->
+    <!-- The custom title bar (drag region) at the top of every page, with a gold line along its bottom edge. -->
     <Style Selector="Border.titlebar">
-      <Setter Property="Height" Value="48" />
-      <Setter Property="Background" Value="{StaticResource PageBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="Height" Value="56" />
+      <Setter Property="Background" Value="{StaticResource TitleBarGradient}" />
+      <Setter Property="BorderBrush" Value="#000000" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="BoxShadow" Value="inset 0 -1 0 0 #4DD9A93F" />
     </Style>
+    <!-- The emblem: a gold diamond outline around a filled diamond. -->
     <Style Selector="Path.mark">
-      <Setter Property="Data" Value="M 7,0 L 14,7 L 7,14 L 0,7 Z M 7,3.5 L 3.5,7 L 7,10.5 L 10.5,7 Z" />
+      <Setter Property="Data" Value="F0 M 12,1 L 23,12 L 12,23 L 1,12 Z M 12,3.1 L 3.1,12 L 12,20.9 L 20.9,12 Z M 12,6 L 18,12 L 12,18 L 6,12 Z" />
       <Setter Property="Fill" Value="{StaticResource GoldBrush}" />
-      <Setter Property="Width" Value="14" />
-      <Setter Property="Height" Value="14" />
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
       <Setter Property="Stretch" Value="None" />
     </Style>
+    <Style Selector="Path.diamond">
+      <Setter Property="Data" Value="M 4,0.5 L 7.5,4 L 4,7.5 L 0.5,4 Z" />
+      <Setter Property="Fill" Value="{StaticResource GoldBrush}" />
+      <Setter Property="Width" Value="8" />
+      <Setter Property="Height" Value="8" />
+      <Setter Property="Stretch" Value="None" />
+    </Style>
+    <Style Selector="Path.gem">
+      <Setter Property="Data" Value="M 6,0.5 L 11.5,6 L 6,11.5 L 0.5,6 Z" />
+      <Setter Property="Stroke" Value="#000000" />
+      <Setter Property="StrokeThickness" Value="1" />
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Stretch" Value="None" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Fill" Duration="0:0:0.35" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.corner">
+      <Setter Property="Width" Value="9" />
+      <Setter Property="Height" Value="9" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldBrush}" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
 
-    <!-- Panels: one surface per region, hairline frame, small radius. -->
+    <!-- Panels: one framed surface per region (gold hairline, black outer ring), small radius. -->
     <Style Selector="Border.panel">
-      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+      <Setter Property="Background" Value="{StaticResource PanelGradient}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldHairlineBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="3" />
       <Setter Property="Padding" Value="20,18" />
+      <Setter Property="BoxShadow" Value="0 0 0 1 #05070A, 0 6 18 0 #59000000" />
     </Style>
-    <Style Selector="Border.divider">
-      <Setter Property="Height" Value="1" />
-      <Setter Property="Background" Value="{StaticResource LineBrush}" />
+    <Style Selector="Border.panel-header">
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="CornerRadius" Value="3,3,0,0" />
+      <Setter Property="Background" Value="{StaticResource HeaderGradient}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldHeaderLineBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
-
-    <!-- Status: the stripe and the icon follow the state; "pending" (changes waiting) wins over the file state. -->
-    <Style Selector="Border.status">
-      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource LineBrush}" />
+    <!-- A sunken read-out (client folder, technical messages). -->
+    <Style Selector="Border.readout">
+      <Setter Property="Background" Value="{StaticResource SlotBrush}" />
+      <Setter Property="BorderBrush" Value="#262D37" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="Border.status Border.stripe">
-      <Setter Property="Width" Value="4" />
-      <Setter Property="CornerRadius" Value="5,0,0,5" />
-      <Setter Property="Background" Value="{StaticResource MpBrush}" />
-    </Style>
-    <Style Selector="Border.status.success Border.stripe">
-      <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
-    </Style>
-    <Style Selector="Border.status.warning Border.stripe, Border.status.pending Border.stripe">
-      <Setter Property="Background" Value="{StaticResource GoldBrush}" />
-    </Style>
-    <Style Selector="Border.status.error Border.stripe">
-      <Setter Property="Background" Value="{StaticResource HpBrush}" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="BoxShadow" Value="inset 0 2 5 0 #99000000" />
     </Style>
 
     <!-- Notices: banners, setup errors and the result of the last action. -->
@@ -287,7 +499,7 @@
       <Setter Property="Background" Value="{StaticResource InfoTintBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource MpBrush}" />
       <Setter Property="BorderThickness" Value="3,0,0,0" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="3" />
       <Setter Property="Padding" Value="12,9" />
     </Style>
     <Style Selector="Border.notice.success">
@@ -308,30 +520,26 @@
       <Setter Property="Padding" Value="0" />
     </Style>
 
-    <!-- Severity icons inside notices and the status (Info, Completed, Warning, Sync, ErrorBadge, Download). -->
-    <Style Selector="Border.notice TextBlock.glyph, Border.status TextBlock.glyph">
+    <!-- Severity icons inside notices (Info, Completed, Warning, ErrorBadge, Download). -->
+    <Style Selector="Border.notice TextBlock.glyph">
       <Setter Property="Text" Value="&#xE946;" />
       <Setter Property="Foreground" Value="{StaticResource MpBrush}" />
       <Setter Property="Margin" Value="0,1,10,0" />
       <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
-    <Style Selector="Border.status TextBlock.glyph">
-      <Setter Property="FontSize" Value="22" />
-      <Setter Property="Margin" Value="0,2,16,0" />
+    <Style Selector="Border.notice.quiet TextBlock.glyph">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Margin" Value="0,2,8,0" />
     </Style>
-    <Style Selector="Border.notice.success TextBlock.glyph, Border.status.success TextBlock.glyph">
+    <Style Selector="Border.notice.success TextBlock.glyph">
       <Setter Property="Text" Value="&#xE930;" />
       <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
     </Style>
-    <Style Selector="Border.notice.warning TextBlock.glyph, Border.status.warning TextBlock.glyph">
+    <Style Selector="Border.notice.warning TextBlock.glyph">
       <Setter Property="Text" Value="&#xE7BA;" />
       <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
     </Style>
-    <Style Selector="Border.status.pending TextBlock.glyph">
-      <Setter Property="Text" Value="&#xE895;" />
-      <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
-    </Style>
-    <Style Selector="Border.notice.error TextBlock.glyph, Border.status.error TextBlock.glyph">
+    <Style Selector="Border.notice.error TextBlock.glyph">
       <Setter Property="Text" Value="&#xEA39;" />
       <Setter Property="Foreground" Value="{StaticResource HpBrush}" />
     </Style>
@@ -340,56 +548,114 @@
       <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
     </Style>
 
-    <!-- Packs: each preview is a strip of icon slots like the buff bar in the game. -->
-    <Style Selector="Border.slot">
+    <!--
+      Packs: each preview is a strip of sunken 32 px icon slots like the inventory in the game; the last slot counts
+      the icons beyond the strip. Border.flash is the gold frame the view flashes after "Zastosuj".
+    -->
+    <Style Selector="Border.iconslot">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="38" />
       <Setter Property="Background" Value="{StaticResource SlotBrush}" />
       <Setter Property="BorderBrush" Value="#000000" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="2" />
-      <Setter Property="Margin" Value="0,0,3,3" />
+      <Setter Property="Margin" Value="0,0,4,0" />
+      <Setter Property="BoxShadow" Value="inset 0 0 0 1 #2A313B, inset 0 3 6 0 #99000000" />
     </Style>
-    <Style Selector="ItemsControl.buffbar">
+    <Style Selector="Border.flash">
+      <Setter Property="Margin" Value="-1" />
+      <Setter Property="BorderBrush" Value="#F2CB66" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BoxShadow" Value="0 0 12 0 #A6F2CB66" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+    <Style Selector="StackPanel.strip">
       <Setter Property="Transitions">
         <Transitions>
           <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
         </Transitions>
       </Setter>
     </Style>
-    <Style Selector="Border.pack.off ItemsControl.buffbar">
+    <Style Selector="Border.pack.off StackPanel.strip">
       <Setter Property="Opacity" Value="0.4" />
     </Style>
     <Style Selector="Border.count">
-      <Setter Property="Background" Value="{StaticResource SlotBrush}" />
-      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="#0B0E12" />
+      <Setter Property="BorderBrush" Value="#262D37" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="2" />
       <Setter Property="Padding" Value="8,2" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
-    <!-- Buttons: "accent" is the gold primary; "ghost" sits on the title bar and in quiet places. -->
+    <!--
+      Buttons. "gold" is the filled gold gradient ("Uruchom L2Dex", "Dalej"); "play" sizes it for the title bar.
+      "apply" is outlined gold: the action a page asks for, so the filled gold stays with the game start. "quiet"
+      is a secondary outlined button, "ghost" sits on the title bar and in quiet places.
+    -->
     <Style Selector="Button">
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="CornerRadius" Value="2" />
       <Setter Property="Padding" Value="14,7" />
     </Style>
     <Style Selector="Button.accent">
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="Button.play">
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="Padding" Value="30,13" />
-      <Setter Property="MinWidth" Value="220" />
+    <Style Selector="Button.gold">
+      <Setter Property="Background" Value="{StaticResource GoldGradient}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldRimBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{StaticResource OnGoldBrush}" />
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="MinWidth" Value="132" />
+      <Setter Property="Padding" Value="22,0" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
-    <!-- "apply": the action the status asks for; outlined, so the filled gold stays with "Uruchom L2Dex". -->
+    <Style Selector="Button.gold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource GoldHoverGradient}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldRimBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource OnGoldBrush}" />
+    </Style>
+    <Style Selector="Button.gold:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource GoldPressedGradient}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GoldRimBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource OnGoldBrush}" />
+    </Style>
+    <Style Selector="Button.gold:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2C2A24" />
+      <Setter Property="BorderBrush" Value="#38352C" />
+      <Setter Property="Foreground" Value="#6E6656" />
+    </Style>
+    <Style Selector="Button.play">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Padding" Value="18,0,22,0" />
+    </Style>
+    <!-- The soft glow and black rim around the filled gold button. -->
+    <Style Selector="Border.gold-glow">
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="BoxShadow" Value="0 0 0 1 #99000000, 0 0 18 0 #47D9A93F" />
+    </Style>
     <Style Selector="Button.apply">
-      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Background" Value="#1FD9A93F" />
       <Setter Property="BorderBrush" Value="{StaticResource GoldBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
-      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{StaticResource GoldLightBrush}" />
+      <Setter Property="FontFamily" Value="{StaticResource DisplayFont}" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="MinWidth" Value="132" />
+      <Setter Property="Padding" Value="20,0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.apply:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#2E2614" />
+      <Setter Property="Background" Value="#38D9A93F" />
       <Setter Property="BorderBrush" Value="{StaticResource GoldHoverColor}" />
-      <Setter Property="Foreground" Value="{StaticResource GoldHoverColor}" />
+      <Setter Property="Foreground" Value="#F4DFA8" />
     </Style>
     <Style Selector="Button.apply:pressed /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#241E10" />
@@ -401,11 +667,26 @@
       <Setter Property="BorderBrush" Value="#323C4A" />
       <Setter Property="Foreground" Value="#5C6573" />
     </Style>
+    <Style Selector="Button.quiet">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="#323C4A" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#B4BCC8" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#141920" />
+      <Setter Property="BorderBrush" Value="#4A5666" />
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
     <Style Selector="Button.ghost, ToggleButton.ghost">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="10,6" />
-      <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="#B4BCC8" />
     </Style>
     <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#222A35" />
@@ -413,11 +694,16 @@
     </Style>
     <Style Selector="ToggleButton.ghost:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.ghost:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="#262E3A" />
-      <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource GoldLightBrush}" />
     </Style>
     <Style Selector="Button.ghost TextBlock.glyph, ToggleButton.ghost TextBlock.glyph">
       <Setter Property="FontSize" Value="14" />
       <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.small">
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
   </Application.Styles>
 </Application>

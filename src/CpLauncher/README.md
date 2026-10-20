@@ -14,13 +14,23 @@ the install state machine and the self-update are L2Mod.Core.
   `UpdateService` per release source, restart info, startup cleanup, hand-off, rollback), `LauncherBuild`
   (running version), `LauncherLog`, game start, bootstrap.
 - `ViewModels/` – `MainWindowViewModel` (setup ↔ dashboard), `SetupViewModel`, `DashboardViewModel`.
-- `Views/` – XAML, `RgbaImageConverter`, dialogs. The look lives in `App.axaml`: colour tokens (L2 Classic slate,
-  CP-bar gold for primary actions, HP red for errors, MP blue for information), Palatino Linotype for headings,
-  icons from the Windows icon font, and the Fluent resource overrides. The window extends into the title bar
-  (`ExtendClientAreaToDecorationsHint`): every page draws its own `Border.titlebar`, Avalonia's drawn
-  decorations keep only minimize/maximize/close. Launcher settings and technical details are a second screen of
-  the dashboard (`IsSettingsOpen`). Paczki, Ogłoszenia and Ustawienia gry are `Expander`s with the `SectionExpander`
+- `Views/` – XAML, `RgbaImageConverter`, dialogs. The look ("Veggie launcher", game-style) lives in `App.axaml`:
+  colour tokens (L2 Classic slate, CP-bar gold, HP red for errors, MP blue for information), framed panels (gold
+  hairline, black outer ring, header strip with a gold diamond), Palatino Linotype for headings and spaced
+  capitals, icons from the Windows icon font, and the Fluent resource overrides. Filled gold (`Button.gold`) is
+  only "Uruchom L2Dex" in the title bar and "Dalej" on the first page; outlined gold (`apply`) is a page's own
+  action. The window extends into a 56 px title bar (`ExtendClientAreaToDecorationsHint`): every page draws its
+  own `Border.titlebar`, Avalonia's drawn decorations keep only minimize/maximize/close. The dashboard's hero
+  shows the Icon.utx state and the result of the last action in the guide's dialog (`GuideDialog` theme; its gem
+  is gold while `HasPendingChanges`). Launcher settings and technical details are a second screen of the
+  dashboard (`IsSettingsOpen`). Paczki, Ogłoszenia and Ustawienia gry are `Expander`s with the `SectionExpander`
   theme; collapsed ones are remembered in settings.json (`collapsedSections`) and show a one-line summary.
+  Pack previews are up to 6 icons at 1:1 plus a "+N" slot.
+- `Assets/Art/` – pictures of the pages, loaded by `Views/Art.cs`; each is optional (a build without the folder
+  has no pictures but works). `dragon.jpg` and `dwarf.png` are stored already mirrored.
+- `Views/Effects.cs` – the only animations: art fading in on load, the dialog's gem flashing when the state
+  changes, the icon slots flashing one after another after "Zastosuj" installed (`ChangesInstalled`). One-shot,
+  never looping, failures ignored, and off when Windows "Animation effects" are off (`Views/Motion.cs`).
 - `Keys/manifest-public.pem` – the leader's public key (a copy of `keys/signing-public.pem` from `keygen`). It must
   stay identical to that file: `publish` and the Pages workflow refuse a dist the launcher would reject.
 

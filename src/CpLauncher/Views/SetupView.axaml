@@ -1,67 +1,93 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:CpLauncher.ViewModels"
+             xmlns:views="clr-namespace:CpLauncher.Views"
              x:Class="CpLauncher.Views.SetupView"
              x:DataType="vm:SetupViewModel">
   <Grid RowDefinitions="Auto,*">
     <Border Classes="titlebar" WindowDecorationProperties.ElementRole="TitleBar">
-      <StackPanel Orientation="Horizontal" Spacing="10" Margin="18,0,148,0" VerticalAlignment="Center">
+      <StackPanel Orientation="Horizontal" Spacing="12" Margin="18,0,156,0" VerticalAlignment="Center">
         <Path Classes="mark" VerticalAlignment="Center" />
-        <TextBlock Classes="heading" Text="CP Launcher" VerticalAlignment="Center" />
+        <TextBlock Classes="brand" Text="VEGGIE LAUNCHER" VerticalAlignment="Center" />
       </StackPanel>
     </Border>
 
-    <ScrollViewer Grid.Row="1">
-      <StackPanel Margin="32" MaxWidth="600" Spacing="16" HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock Classes="display" Text="Gdzie jest Twój klient L2Dex?" TextWrapping="Wrap" />
-        <TextBlock Classes="prose"
-                   Text="Launcher nakłada zmiany kosmetyczne naszego CP (znaczki buffów, tagi debuffów, oznaczenia przedmiotów) na Twój plik Icon.utx i w każdej chwili potrafi przywrócić oryginał." />
+    <!-- Scene: warm light behind the mechanic, a floor line, the mechanic on the left and the setup dialog on the right -->
+    <Grid Grid.Row="1" ColumnDefinitions="400,*" Background="{StaticResource HeroBrush}">
+      <Border Grid.ColumnSpan="2" IsHitTestVisible="False">
+        <Border.Background>
+          <RadialGradientBrush Center="24%,78%" GradientOrigin="24%,78%" RadiusX="38%" RadiusY="62%">
+            <GradientStop Offset="0" Color="#24D9A93F" />
+            <GradientStop Offset="1" Color="#00D9A93F" />
+          </RadialGradientBrush>
+        </Border.Background>
+      </Border>
+      <Border Grid.ColumnSpan="2" Height="1" VerticalAlignment="Bottom" Margin="0,0,0,64"
+              Background="{StaticResource GoldFadeLine}" IsHitTestVisible="False" />
+      <Ellipse Width="260" Height="26" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,70,50"
+               Fill="{StaticResource GroundShadow}" IsHitTestVisible="False" />
+      <Image Name="Mechanic" Source="{x:Static views:Art.Mechanic}" Stretch="Uniform" MaxHeight="500"
+             HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24,24,24,60" IsHitTestVisible="False" />
 
-        <Border Classes="panel" Margin="0,8,0,0">
-          <StackPanel Spacing="12">
-            <StackPanel Spacing="2">
-              <TextBlock Classes="strong" Text="Folder klienta" />
-              <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{Binding RequiredFilesText}" />
-            </StackPanel>
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBox Text="{Binding ClientDirectory}" PlaceholderText="np. C:\Lineage2Dex" VerticalContentAlignment="Center" />
-              <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding BrowseCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Classes="glyph" FontSize="14" Text="&#xE838;" VerticalAlignment="Center" />
-                  <TextBlock Text="Wybierz…" />
+      <ScrollViewer Grid.Column="1">
+        <StackPanel Margin="24,32,32,32" MaxWidth="540" Spacing="16" HorizontalAlignment="Left" VerticalAlignment="Center">
+          <HeaderedContentControl Theme="{StaticResource GuideDialog}" Classes="pointer-low" Padding="22,20,22,22">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="display" Text="Gdzie jest Twój klient L2Dex?" TextWrapping="Wrap" />
+              <TextBlock Classes="prose" Foreground="{StaticResource ProseBrush}"
+                         Text="Launcher nakłada zmiany kosmetyczne naszego CP (znaczki buffów, tagi debuffów, oznaczenia przedmiotów) na Twój plik Icon.utx i w każdej chwili potrafi przywrócić oryginał." />
+
+              <Border Classes="panel" Padding="16,14,16,16" Margin="0,10,0,0">
+                <StackPanel Spacing="10">
+                  <StackPanel Spacing="2">
+                    <TextBlock Classes="strong" Text="Folder klienta" />
+                    <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{Binding RequiredFilesText}" />
+                  </StackPanel>
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Text="{Binding ClientDirectory}" PlaceholderText="np. C:\Lineage2Dex" VerticalContentAlignment="Center" />
+                    <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding BrowseCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Classes="glyph" FontSize="14" Text="&#xE838;" VerticalAlignment="Center" />
+                        <TextBlock Text="Wybierz…" />
+                      </StackPanel>
+                    </Button>
+                  </Grid>
+
+                  <ItemsControl ItemsSource="{Binding Errors}" IsVisible="{Binding !!Errors.Count}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Spacing="6" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <Border Classes="notice error">
+                          <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Classes="glyph" />
+                            <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
                 </StackPanel>
-              </Button>
-            </Grid>
+              </Border>
 
-            <ItemsControl ItemsSource="{Binding Errors}" IsVisible="{Binding !!Errors.Count}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <StackPanel Spacing="6" />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <Border Classes="notice error">
-                    <Grid ColumnDefinitions="Auto,*">
-                      <TextBlock Classes="glyph" />
-                      <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,4,0,0">
-              <Button Classes="ghost" Content="Anuluj" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" />
-              <Button Classes="accent" Content="Dalej" Command="{Binding ContinueCommand}" MinWidth="110"
-                      HorizontalContentAlignment="Center" />
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,8,0,0">
+                <Button Classes="ghost" Content="Anuluj" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" />
+                <Border Classes="gold-glow">
+                  <Button Classes="gold" Command="{Binding ContinueCommand}">
+                    <TextBlock Text="DALEJ" LetterSpacing="1.4" />
+                  </Button>
+                </Border>
+              </StackPanel>
             </StackPanel>
-          </StackPanel>
-        </Border>
+          </HeaderedContentControl>
 
-        <TextBlock Classes="muted small prose"
-                   Text="Launcher zmienia tylko SysTextures\Icon.utx i (na Twoje życzenie) system_season\Option.ini. Kopie oryginałów trzyma we własnym folderze danych." />
-      </StackPanel>
-    </ScrollViewer>
+          <TextBlock Classes="muted small prose" Margin="4,0,0,0"
+                     Text="Launcher zmienia tylko SysTextures\Icon.utx i (na Twoje życzenie) system_season\Option.ini. Kopie oryginałów trzyma we własnym folderze danych." />
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
   </Grid>
 </UserControl>
