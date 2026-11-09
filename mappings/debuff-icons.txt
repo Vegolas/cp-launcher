@@ -1,0 +1,32 @@
+# EXPERIMENT 2026-11-08 - skills whose icon floats above the target's head when the skill is cast.
+# Used by scripts/New-EffectsExperiment.cs (--icons). The icon is a pre-flipped copy of Icon_h.skill_i.skill<id>
+# shown by a new effect added to the skill's ShotAction in LineageSkillEffect.u, so it plays on every cast that
+# reaches the target (also when a debuff is resisted) and stays for a fixed time, not for the debuff's real duration.
+# Format: <skill id> [seconds] [@<effect class id>]  # name
+# @<id>: the game plays this skill through l2_<id>_skill instead of its own class. Every other skill playing that
+# class shows the icon too. The client picks a skill's class elsewhere (probably skillgrp.dat, out of scope), so a
+# skill without its own class needs @<id>: a new l2_<id>_skill class for it is never played (Noblesse Blessing and
+# Slow, 2026-11-08). The class number comes from the probe build (work\out\effects-probe), which shows it over the
+# target. Probe results 2026-11-09: Noblesse Blessing 1048, Slow and Curse Poison 1168, Arcane Chaos and Sleep 1069.
+# Not on L2Dex (no icon or effect class): 1224 Surrender to Poison, 1383-1385 Mass Surrender to Fire/Water/Wind.
+
+1071  # Surrender to Water
+1074  # Surrender to Wind
+1083  # Surrender to Fire
+1223  # Surrender to Earth
+1056  # Cancellation (works in game)
+1323 @1048  # Noblesse Blessing: plays Bless the Soul's class (wh_bless_the_soul_ta), so Bless the Soul shows it too
+1016  # Resurrection
+1398  # Mana Burn
+1399  # Mana Storm
+
+# Shared with a combat debuff, which would show the same icon: skipped (leader's decision 2026-11-09, a wrong icon
+# in a fight is worse than none).
+# 1160 @1168  # Slow (Curse Poison plays the same class)
+# 1338 @1069  # Arcane Chaos (Sleep plays the same class)
+
+# No own class and not probed yet, so a new class would never be played:
+# 1254  # Mass Resurrection
+# 1064  # Silence
+# 1336  # Curse of Doom
+# 1298  # Mass Slow
