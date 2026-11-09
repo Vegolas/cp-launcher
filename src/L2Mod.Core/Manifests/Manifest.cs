@@ -36,28 +36,69 @@ public sealed record Manifest(
         return false;
     }
 
-    /// <summary>Operations of the selected packs for one file, in manifest order. Unknown pack ids are ignored.</summary>
-    public IReadOnlyList<IIconOperation> GetOperations(string file, IReadOnlyCollection<string> selectedPackIds)
+    /// <summary>
+    /// Operations of the selection for one file, in manifest order. The selection holds the ids of selected packs
+    /// and, for packs with options, the <see cref="Pack.GetSelectionId"/> of each selected option; unknown ids are
+    /// ignored.
+    /// </summary>
+    public IReadOnlyList<IPatchOperation> GetOperations(string file, IReadOnlyCollection<string> selectedIds)
     {
-        var selected = new HashSet<string>(selectedPackIds, StringComparer.Ordinal);
-        var operations = new List<IIconOperation>();
+        var selected = new HashSet<string>(selectedIds, StringComparer.Ordinal);
+        var operations = new List<IPatchOperation>();
         foreach (Pack pack in Packs)
         {
-            if (!selected.Contains(pack.Id))
+            if (!pack.HasOptions)
             {
+                if (selected.Contains(pack.Id))
+                {
+                    AddForFile(pack.Operations, file, operations);
+                }
+
                 continue;
             }
 
-            foreach (IIconOperation operation in pack.Operations)
+            foreach (PackOption option in pack.Options)
             {
-                if (string.Equals(operation.File, file, StringComparison.OrdinalIgnoreCase))
+                if (selected.Contains(pack.GetSelectionId(option)))
                 {
-                    operations.Add(operation);
+                    AddForFile(option.Operations, file, operations);
                 }
             }
         }
 
         return operations;
+    }
+
+    /// <summary>Every pack id and option selection id, i.e. the selection of everything.</summary>
+    public IReadOnlyList<string> GetAllSelectionIds()
+    {
+        var ids = new List<string>();
+        foreach (Pack pack in Packs)
+        {
+            if (!pack.HasOptions)
+            {
+                ids.Add(pack.Id);
+                continue;
+            }
+
+            foreach (PackOption option in pack.Options)
+            {
+                ids.Add(pack.GetSelectionId(option));
+            }
+        }
+
+        return ids;
+    }
+
+    private static void AddForFile(IReadOnlyList<IPatchOperation> source, string file, List<IPatchOperation> operations)
+    {
+        foreach (IPatchOperation operation in source)
+        {
+            if (string.Equals(operation.File, file, StringComparison.OrdinalIgnoreCase))
+            {
+                operations.Add(operation);
+            }
+        }
     }
 }
 
@@ -66,7 +107,42 @@ public sealed record LauncherRelease(string Version, string Url, string Sha256);
 public sealed record Announcement(DateOnly Date, string Title, string Text);
 
 /// <param name="Description">What the pack changes, in the leader's words (plain text, line breaks allowed); optional.</param>
-public sealed record Pack(string Id, string Name, bool Default, IReadOnlyList<IIconOperation> Operations, string? Description = null);
+/// <param name="Operations">Everything the pack can change; for a pack with <see cref="Options"/>, the operations of
+/// all options in order (use <see cref="WithOptions"/>).</param>
+public sealed record Pack(string Id, string Name, bool Default, IReadOnlyList<IPatchOperation> Operations, string? Description = null)
+{
+    /// <summary>
+    /// Choices the member ticks one by one (e.g. one status of the icons over the target); empty for a pack that is
+    /// selected as a whole. Launchers before 1.2.0 skip a pack with options (it has no "operations").
+    /// </summary>
+    public IReadOnlyList<PackOption> Options { get; init; } = Array.Empty<PackOption>();
+
+    public bool HasOptions
+    {
+        get
+        {
+            return Options.Count > 0;
+        }
+    }
+
+    public static Pack WithOptions(string id, string name, bool isDefault, IReadOnlyList<PackOption> options, string? description = null)
+    {
+        var operations = options.SelectMany(option => option.Operations).ToList();
+        return new Pack(id, name, isDefault, operations, description)
+        {
+            Options = options,
+        };
+    }
+
+    /// <summary>"&lt;pack id&gt;/&lt;option id&gt;": how an option is selected (settings, <see cref="Manifest.GetOperations"/>).</summary>
+    public string GetSelectionId(PackOption option)
+    {
+        return $"{Id}/{option.Id}";
+    }
+}
+
+/// <param name="Default">Whether the option is selected until the member decides.</param>
+public sealed record PackOption(string Id, string Name, bool Default, IReadOnlyList<IPatchOperation> Operations, string? Description = null);
 
 public sealed record OptionPreset(string Id, string Name, IReadOnlyList<IniValue> Values);
 
@@ -170,6 +246,8 @@ public sealed record ManifestLimits
     public int MaxPacks { get; init; } = 64;
 
     public int MaxOperationsPerPack { get; init; } = 512;
+
+    public int MaxOptionsPerPack { get; init; } = 128;
 
     public int MaxOperationsTotal { get; init; } = 2048;
 

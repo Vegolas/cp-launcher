@@ -4,7 +4,8 @@ Manual in-game test of the effect experiment (scripts\New-EffectsExperiment.cs):
 system_season packages, shows their state, or restores the originals.
 
 .DESCRIPTION
-Only for a hand-run test; the launcher never installs these files.
+Only for a hand-run test of a build from work\ (e.g. a probe build). The launcher installs the effect packs itself
+and treats an experiment build in the client as an unknown version, so restore it with -Restore before using them.
 Install replaces a client file only when it is byte-identical to the copy in work\original-effects that the
 experiment was built from, or to another build of the experiment (listed in builds.txt in the source dir or a sibling
 dir such as work\out\effects-probe, which the build script keeps). -Status changes nothing: it tells for each file whether the client holds the original, the

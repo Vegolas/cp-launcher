@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using L2Mod.Core.Effects;
 using L2Mod.Core.Imaging;
 using L2Mod.Core.Ini;
 using L2Mod.Core.Manifests;
@@ -24,7 +25,8 @@ public static class ManifestWriter
 
     /// <remarks>
     /// A pack's <see cref="Pack.Description"/> is written as "description". Launchers that predate it ignore unknown
-    /// pack fields, so it is safe to publish to them.
+    /// pack fields, so it is safe to publish to them. A pack with <see cref="Pack.Options"/> is written with
+    /// "options" instead of "operations"; launchers before 1.2.0 skip it (and effect operations) with a note.
     /// </remarks>
     public static byte[] Write(Manifest manifest)
     {
@@ -133,24 +135,81 @@ public static class ManifestWriter
             }
 
             writer.WriteBoolean("default", pack.Default);
-            writer.WriteStartArray("operations");
-            foreach (IIconOperation operation in pack.Operations)
+            if (pack.HasOptions)
             {
-                WriteOperation(writer, operation);
+                writer.WriteStartArray("options");
+                foreach (PackOption option in pack.Options)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("id", option.Id);
+                    writer.WriteString("name", option.Name);
+                    if (option.Description is not null)
+                    {
+                        writer.WriteString("description", option.Description);
+                    }
+
+                    writer.WriteBoolean("default", option.Default);
+                    WriteOperations(writer, option.Operations);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+            else
+            {
+                WriteOperations(writer, pack.Operations);
             }
 
-            writer.WriteEndArray();
             writer.WriteEndObject();
         }
 
         writer.WriteEndArray();
     }
 
-    private static void WriteOperation(Utf8JsonWriter writer, IIconOperation operation)
+    private static void WriteOperations(Utf8JsonWriter writer, IReadOnlyList<IPatchOperation> operations)
+    {
+        writer.WriteStartArray("operations");
+        foreach (IPatchOperation operation in operations)
+        {
+            WriteOperation(writer, operation);
+        }
+
+        writer.WriteEndArray();
+    }
+
+    private static void WriteOperation(Utf8JsonWriter writer, IPatchOperation operation)
     {
         writer.WriteStartObject();
         switch (operation)
         {
+            case EffectSwapOperation swap:
+            {
+                writer.WriteString("op", swap.Kind);
+                writer.WriteString("file", swap.File);
+                writer.WriteStartArray("skills");
+                writer.WriteNumberValue(swap.First);
+                writer.WriteNumberValue(swap.Second);
+                writer.WriteEndArray();
+                break;
+            }
+
+            case GoldClickArrowOperation arrow:
+            {
+                writer.WriteString("op", arrow.Kind);
+                writer.WriteString("file", arrow.File);
+                break;
+            }
+
+            case TargetIconOperation icon:
+            {
+                writer.WriteString("op", icon.Kind);
+                writer.WriteString("file", icon.File);
+                writer.WriteNumber("skill", icon.Skill);
+                writer.WriteNumber("effectClass", icon.EffectClass);
+                writer.WriteNumber("seconds", icon.Seconds);
+                break;
+            }
+
             case BadgeOperation badge:
             {
                 if (badge.Style.Border != 1 || badge.Style.Crop != 0 || badge.Style.BorderColor != Rgb.Black)

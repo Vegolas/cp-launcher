@@ -5,17 +5,28 @@ public static class ClientFiles
 {
     public const string IconUtx = "Icon.utx";
 
+    /// <summary>Skill effect classes (system_season); effect swaps and icons over the target.</summary>
+    public const string LineageSkillEffect = "LineageSkillEffect.u";
+
+    /// <summary>General effects (system_season); the click-to-move arrow.</summary>
+    public const string LineageEffect = "LineageEffect.u";
+
     private static readonly Dictionary<string, string> PatchablePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         [IconUtx] = Path.Combine("SysTextures", IconUtx),
+        [LineageSkillEffect] = Path.Combine("system_season", LineageSkillEffect),
+        [LineageEffect] = Path.Combine("system_season", LineageEffect),
     };
 
-    /// <summary>Whitelisted texture packages (file name as used in manifests).</summary>
+    /// <summary>
+    /// Whitelisted files (file name as used in manifests), in the order the installer handles them. Icon.utx comes
+    /// first: the icons over the target in LineageSkillEffect.u are read from its original.
+    /// </summary>
     public static IReadOnlyCollection<string> Patchable
     {
         get
         {
-            return new[] { IconUtx };
+            return new[] { IconUtx, LineageSkillEffect, LineageEffect };
         }
     }
 
@@ -30,6 +41,12 @@ public static class ClientFiles
     public static bool IsPatchable(string fileName)
     {
         return PatchablePaths.ContainsKey(fileName);
+    }
+
+    /// <summary>True for the texture package whose icons the <c>IIconOperation</c>s draw on.</summary>
+    public static bool IsIconPackage(string fileName)
+    {
+        return string.Equals(fileName, IconUtx, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>The whitelisted spelling of <paramref name="fileName"/> (manifest names are case-insensitive).</summary>

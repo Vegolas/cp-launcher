@@ -77,10 +77,10 @@ public sealed class DistBuilderTests : IDisposable
         Manifest manifest = ManifestSignature.ReadVerified(File.ReadAllBytes(Path.Combine(_fixture.DistPath, DistLayout.ManifestFile)), signature, Keys.PublicKeyPem).Manifest;
         var installer = new PatchInstaller(new InstallerOptions(@"C:\client", @"C:\data"), installed, new FakeProcessMonitor());
 
-        PatchFileResult result = Assert.Single(installer.Apply(manifest, RecipeFixture.PackIds, new DirectoryAssetStore(new PhysicalFileSystem(), _fixture.DistPath)));
+        PatchFileResult result = installer.Apply(manifest, RecipeFixture.PackIds, new DirectoryAssetStore(new PhysicalFileSystem(), _fixture.DistPath)).Single(item => item.FileName == "Icon.utx");
 
         Assert.Equal(PatchOutcome.Installed, result.Outcome);
-        byte[] expected = OperationComposer.Build(original, build.Packs.SelectMany(pack => pack.Operations).ToList(), new InMemoryAssets(build.Files)).Replacement.FileBytes;
+        byte[] expected = OperationComposer.Build(original, build.Packs.SelectMany(pack => pack.Operations).OfType<IIconOperation>().ToList(), new InMemoryAssets(build.Files)).Replacement.FileBytes;
         Assert.Equal(expected, installed.ReadAllBytes(Path.Combine(@"C:\client", "SysTextures", "Icon.utx")));
     }
 

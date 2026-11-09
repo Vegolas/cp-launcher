@@ -1,3 +1,4 @@
+using L2Mod.Core;
 using L2Mod.Core.Badges;
 using L2Mod.Core.Imaging;
 using L2Mod.Core.Installation;
@@ -45,9 +46,9 @@ public class PatchInstallerTests
     public void Apply_OnSupportedOriginal_BacksUpAndInstallsTheVerifiedPatch()
     {
         Manifest manifest = CreateManifest();
-        Assert.Equal(PendingAction.Install, Single(_installer.GetStatus(manifest, Tags)).Pending);
+        Assert.Equal(PendingAction.Install, IconEntry(_installer.GetStatus(manifest, Tags)).Pending);
 
-        PatchFileResult result = Single(_installer.Apply(manifest, Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(manifest, Tags, _assets));
 
         Assert.Equal(PatchOutcome.Installed, result.Outcome);
         byte[] installed = _fileSystem.ReadAllBytes(ClientPath);
@@ -55,7 +56,7 @@ public class PatchInstallerTests
         Assert.Equal(_original, _fileSystem.ReadAllBytes(_options.GetBackupPath(Icon, OriginalHash)));
         Assert.True(_fileSystem.FileExists(_options.StatePath));
         Assert.DoesNotContain(_fileSystem.WrittenPaths, path => path.EndsWith(VerifiedWrite.TemporarySuffix) && _fileSystem.FileExists(path));
-        PatchFileStatus status = Single(_installer.GetStatus(manifest, Tags));
+        PatchFileStatus status = IconEntry(_installer.GetStatus(manifest, Tags));
         Assert.Equal((PatchFileState.OurPatch, PendingAction.None, true), (status.State, status.Pending, status.HasBackup));
     }
 
@@ -66,7 +67,7 @@ public class PatchInstallerTests
         _installer.Apply(manifest, Tags, _assets);
         _fileSystem.WrittenPaths.Clear();
 
-        PatchFileResult result = Single(_installer.Apply(manifest, Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(manifest, Tags, _assets));
 
         Assert.Equal(PatchOutcome.Unchanged, result.Outcome);
         Assert.Empty(_fileSystem.WrittenPaths);
@@ -77,9 +78,9 @@ public class PatchInstallerTests
     {
         Manifest manifest = CreateManifest();
         _installer.Apply(manifest, Tags, _assets);
-        Assert.Equal(PendingAction.Rebuild, Single(_installer.GetStatus(manifest, TagsAndBadges)).Pending);
+        Assert.Equal(PendingAction.Rebuild, IconEntry(_installer.GetStatus(manifest, TagsAndBadges)).Pending);
 
-        PatchFileResult result = Single(_installer.Apply(manifest, TagsAndBadges, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(manifest, TagsAndBadges, _assets));
 
         Assert.Equal(PatchOutcome.Rebuilt, result.Outcome);
         Assert.Equal(Build(TagsAndBadges), _fileSystem.ReadAllBytes(ClientPath));
@@ -91,7 +92,7 @@ public class PatchInstallerTests
         _installer.Apply(CreateManifest(), Tags, _assets);
         Manifest changed = CreateManifest(tagColor: "#FF9900");
 
-        PatchFileResult result = Single(_installer.Apply(changed, Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(changed, Tags, _assets));
 
         Assert.Equal(PatchOutcome.Rebuilt, result.Outcome);
         Assert.Equal(Build(Tags, changed), _fileSystem.ReadAllBytes(ClientPath));
@@ -103,11 +104,11 @@ public class PatchInstallerTests
         Manifest manifest = CreateManifest();
         _installer.Apply(manifest, Tags, _assets);
 
-        PatchFileResult result = Single(_installer.Apply(manifest, Array.Empty<string>(), _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(manifest, Array.Empty<string>(), _assets));
 
         Assert.Equal(PatchOutcome.Restored, result.Outcome);
         Assert.Equal(_original, _fileSystem.ReadAllBytes(ClientPath));
-        Assert.Equal(PatchFileState.Original, Single(_installer.GetStatus(manifest, Array.Empty<string>())).State);
+        Assert.Equal(PatchFileState.Original, IconEntry(_installer.GetStatus(manifest, Array.Empty<string>())).State);
     }
 
     [Fact]
@@ -115,7 +116,7 @@ public class PatchInstallerTests
     {
         _installer.Apply(CreateManifest(), Tags, _assets);
 
-        PatchFileResult result = Single(_installer.Apply(CreateManifest(enabled: false), Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(CreateManifest(enabled: false), Tags, _assets));
 
         Assert.Equal(PatchOutcome.Restored, result.Outcome);
         Assert.Equal(_original, _fileSystem.ReadAllBytes(ClientPath));
@@ -124,7 +125,7 @@ public class PatchInstallerTests
     [Fact]
     public void KillSwitch_LeavesTheOriginalAlone()
     {
-        PatchFileResult result = Single(_installer.Apply(CreateManifest(enabled: false), Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(CreateManifest(enabled: false), Tags, _assets));
 
         Assert.Equal(PatchOutcome.Unchanged, result.Outcome);
         Assert.Empty(_fileSystem.WrittenPaths);
@@ -137,7 +138,7 @@ public class PatchInstallerTests
         byte[] unknown = MakeUnknownVersion();
         _fileSystem.WrittenPaths.Clear();
 
-        PatchFileResult result = Single(_installer.Apply(CreateManifest(enabled: false), Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(CreateManifest(enabled: false), Tags, _assets));
 
         Assert.Equal(PatchOutcome.Skipped, result.Outcome);
         Assert.Equal(unknown, _fileSystem.ReadAllBytes(ClientPath));
@@ -149,13 +150,13 @@ public class PatchInstallerTests
     {
         byte[] unknown = MakeUnknownVersion();
 
-        PatchFileResult result = Single(_installer.Apply(CreateManifest(), Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(CreateManifest(), Tags, _assets));
 
         Assert.Equal(PatchOutcome.Skipped, result.Outcome);
         Assert.Contains("Unknown version of Icon.utx", result.Message);
         Assert.Equal(unknown, _fileSystem.ReadAllBytes(ClientPath));
         Assert.Empty(_fileSystem.WrittenPaths);
-        PatchFileStatus status = Single(_installer.GetStatus(CreateManifest(), Tags));
+        PatchFileStatus status = IconEntry(_installer.GetStatus(CreateManifest(), Tags));
         Assert.Equal((PatchFileState.Unknown, false), (status.State, status.HasBackup));
     }
 
@@ -164,11 +165,11 @@ public class PatchInstallerTests
     {
         _installer.Apply(CreateManifest(), Tags, _assets);
         MakeUnknownVersion();
-        PatchFileStatus status = Single(_installer.GetStatus(CreateManifest(), Tags));
+        PatchFileStatus status = IconEntry(_installer.GetStatus(CreateManifest(), Tags));
         Assert.Equal((PatchFileState.Unknown, true), (status.State, status.HasBackup));
         Assert.Contains("can be restored", status.Message);
 
-        PatchFileResult result = Single(_installer.Restore());
+        PatchFileResult result = IconEntry(_installer.Restore());
 
         Assert.Equal(PatchOutcome.Restored, result.Outcome);
         Assert.Equal(_original, _fileSystem.ReadAllBytes(ClientPath));
@@ -179,11 +180,11 @@ public class PatchInstallerTests
     {
         _installer.Apply(CreateManifest(), TagsAndBadges, _assets);
 
-        PatchFileResult result = Single(_installer.Restore());
+        PatchFileResult result = IconEntry(_installer.Restore());
 
         Assert.Equal(PatchOutcome.Restored, result.Outcome);
         Assert.Equal(_original, _fileSystem.ReadAllBytes(ClientPath));
-        Assert.Equal(PatchOutcome.Unchanged, Single(_installer.Restore()).Outcome);
+        Assert.Equal(PatchOutcome.Unchanged, IconEntry(_installer.Restore()).Outcome);
     }
 
     [Fact]
@@ -191,7 +192,7 @@ public class PatchInstallerTests
     {
         MakeUnknownVersion();
 
-        PatchFileResult result = Single(_installer.Restore());
+        PatchFileResult result = IconEntry(_installer.Restore());
 
         Assert.Equal(PatchOutcome.Skipped, result.Outcome);
         Assert.Empty(_fileSystem.WrittenPaths);
@@ -207,8 +208,8 @@ public class PatchInstallerTests
         _processes.Running.Add(process);
         _fileSystem.WrittenPaths.Clear();
 
-        PatchFileResult apply = Single(_installer.Apply(CreateManifest(), TagsAndBadges, _assets));
-        PatchFileResult restore = Single(_installer.Restore());
+        PatchFileResult apply = IconEntry(_installer.Apply(CreateManifest(), TagsAndBadges, _assets));
+        PatchFileResult restore = IconEntry(_installer.Restore());
 
         Assert.Equal(PatchOutcome.Blocked, apply.Outcome);
         Assert.Equal(PatchOutcome.Blocked, restore.Outcome);
@@ -222,7 +223,7 @@ public class PatchInstallerTests
     {
         _fileSystem.DeleteFile(ClientPath);
 
-        PatchFileResult result = Single(_installer.Apply(CreateManifest(), Tags, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(CreateManifest(), Tags, _assets));
 
         Assert.Equal(PatchOutcome.Skipped, result.Outcome);
         Assert.Contains("not found", result.Message);
@@ -235,8 +236,8 @@ public class PatchInstallerTests
         byte[] patched = _fileSystem.ReadAllBytes(ClientPath);
         Manifest newer = CreateManifest() with { Schema = 2, Packs = Array.Empty<Pack>() };
 
-        PatchFileResult kept = Single(_installer.Apply(newer, Tags, _assets));
-        PatchFileResult switchedOff = Single(_installer.Apply(newer with { Enabled = false }, Tags, _assets));
+        PatchFileResult kept = IconEntry(_installer.Apply(newer, Tags, _assets));
+        PatchFileResult switchedOff = IconEntry(_installer.Apply(newer with { Enabled = false }, Tags, _assets));
 
         Assert.Equal(PatchOutcome.Unchanged, kept.Outcome);
         Assert.Contains("launcher is updated", kept.Message);
@@ -254,7 +255,7 @@ public class PatchInstallerTests
             SupportedOriginals = new Dictionary<string, IReadOnlyList<string>> { [Icon] = new[] { new string('d', 64) } },
         };
 
-        PatchFileResult result = Single(_installer.Apply(moved, TagsAndBadges, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(moved, TagsAndBadges, _assets));
 
         Assert.Equal(PatchOutcome.Unchanged, result.Outcome);
         Assert.Contains("no longer supports", result.Message);
@@ -268,7 +269,7 @@ public class PatchInstallerTests
         byte[] patched = _fileSystem.ReadAllBytes(ClientPath);
         _fileSystem.Seed(_options.GetBackupPath(Icon, OriginalHash), new byte[] { 1, 2, 3 });
 
-        PatchFileResult result = Single(_installer.Apply(CreateManifest(), TagsAndBadges, _assets));
+        PatchFileResult result = IconEntry(_installer.Apply(CreateManifest(), TagsAndBadges, _assets));
 
         Assert.Equal(PatchOutcome.Failed, result.Outcome);
         Assert.Contains("damaged", result.Message);
@@ -289,13 +290,13 @@ public class PatchInstallerTests
         Manifest manifest = CreateManifest() with { Packs = new[] { overlay } };
         _assets.Replace(path, PngCodec.Encode(TestPackageBuilder.SolidImage(8, 8, 255, 0, 0)));
 
-        PatchFileResult tampered = Single(_installer.Apply(manifest, new[] { "marks" }, _assets));
+        PatchFileResult tampered = IconEntry(_installer.Apply(manifest, new[] { "marks" }, _assets));
 
         Assert.Equal(PatchOutcome.Failed, tampered.Outcome);
         Assert.Equal(_original, _fileSystem.ReadAllBytes(ClientPath));
 
         _assets.Replace(path, png);
-        PatchFileResult installed = Single(_installer.Apply(manifest, new[] { "marks" }, _assets));
+        PatchFileResult installed = IconEntry(_installer.Apply(manifest, new[] { "marks" }, _assets));
 
         Assert.Equal(PatchOutcome.Installed, installed.Outcome);
     }
@@ -316,15 +317,15 @@ public class PatchInstallerTests
     public void Reason_FollowsInstallUpToDateRebuildAndRestore()
     {
         Manifest manifest = CreateManifest();
-        Assert.Equal(PatchReason.NotInstalled, Single(_installer.GetStatus(manifest, Tags)).Reason);
-        Assert.Equal(PatchReason.NothingSelected, Single(_installer.GetStatus(manifest, Array.Empty<string>())).Reason);
+        Assert.Equal(PatchReason.NotInstalled, IconEntry(_installer.GetStatus(manifest, Tags)).Reason);
+        Assert.Equal(PatchReason.NothingSelected, IconEntry(_installer.GetStatus(manifest, Array.Empty<string>())).Reason);
 
         Assert.Equal((PatchOutcome.Installed, PatchReason.NotInstalled), Describe(_installer.Apply(manifest, Tags, _assets)));
-        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(manifest, Tags)).Reason);
+        Assert.Equal(PatchReason.UpToDate, IconEntry(_installer.GetStatus(manifest, Tags)).Reason);
         Assert.Equal((PatchOutcome.Unchanged, PatchReason.UpToDate), Describe(_installer.Apply(manifest, Tags, _assets)));
-        Assert.Equal(PatchReason.Outdated, Single(_installer.GetStatus(manifest, TagsAndBadges)).Reason);
+        Assert.Equal(PatchReason.Outdated, IconEntry(_installer.GetStatus(manifest, TagsAndBadges)).Reason);
         Assert.Equal((PatchOutcome.Rebuilt, PatchReason.Outdated), Describe(_installer.Apply(manifest, TagsAndBadges, _assets)));
-        PatchFileStatus nothing = Single(_installer.GetStatus(manifest, Array.Empty<string>()));
+        PatchFileStatus nothing = IconEntry(_installer.GetStatus(manifest, Array.Empty<string>()));
         Assert.Equal((PendingAction.Restore, PatchReason.NothingSelected), (nothing.Pending, nothing.Reason));
         Assert.Equal((PatchOutcome.Restored, PatchReason.NothingSelected), Describe(_installer.Apply(manifest, Array.Empty<string>(), _assets)));
     }
@@ -333,8 +334,8 @@ public class PatchInstallerTests
     public void Reason_TellsKillSwitchNewerSchemaAndUnsupportedOriginalApart()
     {
         Manifest manifest = CreateManifest();
-        Assert.Equal(PatchReason.SwitchedOff, Single(_installer.GetStatus(CreateManifest(enabled: false), Tags)).Reason);
-        Assert.Equal(PatchReason.NeedsNewerLauncher, Single(_installer.GetStatus(manifest with { Schema = 2 }, Tags)).Reason);
+        Assert.Equal(PatchReason.SwitchedOff, IconEntry(_installer.GetStatus(CreateManifest(enabled: false), Tags)).Reason);
+        Assert.Equal(PatchReason.NeedsNewerLauncher, IconEntry(_installer.GetStatus(manifest with { Schema = 2 }, Tags)).Reason);
         _installer.Apply(manifest, Tags, _assets);
         Manifest moved = manifest with
         {
@@ -343,7 +344,7 @@ public class PatchInstallerTests
 
         Assert.Equal((PatchOutcome.Unchanged, PatchReason.NeedsNewerLauncher), Describe(_installer.Apply(manifest with { Schema = 2 }, Tags, _assets)));
         Assert.Equal((PatchOutcome.Unchanged, PatchReason.UnsupportedOriginal), Describe(_installer.Apply(moved, TagsAndBadges, _assets)));
-        PatchFileStatus off = Single(_installer.GetStatus(CreateManifest(enabled: false), Tags));
+        PatchFileStatus off = IconEntry(_installer.GetStatus(CreateManifest(enabled: false), Tags));
         Assert.Equal((PendingAction.Restore, PatchReason.SwitchedOff), (off.Pending, off.Reason));
         Assert.Equal((PatchOutcome.Restored, PatchReason.SwitchedOff), Describe(_installer.Apply(CreateManifest(enabled: false), Tags, _assets)));
     }
@@ -356,7 +357,7 @@ public class PatchInstallerTests
         Assert.Equal((PatchOutcome.Failed, PatchReason.Error), Describe(_installer.Apply(CreateManifest(), TagsAndBadges, _assets)));
 
         MakeUnknownVersion();
-        Assert.Equal(PatchReason.UnknownVersion, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchReason.UnknownVersion, IconEntry(_installer.GetStatus(CreateManifest(), Tags)).Reason);
         Assert.Equal((PatchOutcome.Skipped, PatchReason.UnknownVersion), Describe(_installer.Apply(CreateManifest(), Tags, _assets)));
 
         _processes.Running.Add("L2");
@@ -365,7 +366,7 @@ public class PatchInstallerTests
         _processes.Running.Clear();
 
         _fileSystem.DeleteFile(ClientPath);
-        Assert.Equal(PatchReason.FileMissing, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchReason.FileMissing, IconEntry(_installer.GetStatus(CreateManifest(), Tags)).Reason);
         Assert.Equal((PatchOutcome.Skipped, PatchReason.FileMissing), Describe(_installer.Apply(CreateManifest(), Tags, _assets)));
     }
 
@@ -437,16 +438,16 @@ public class PatchInstallerTests
         var other = new PatchInstaller(otherOptions, _fileSystem, _processes);
         _installer.Apply(CreateManifest(), Tags, _assets);
 
-        PatchFileStatus otherBefore = Single(other.GetStatus(CreateManifest(), TagsAndBadges));
+        PatchFileStatus otherBefore = IconEntry(other.GetStatus(CreateManifest(), TagsAndBadges));
         Assert.Equal((PatchFileState.Original, PendingAction.Install, false), (otherBefore.State, otherBefore.Pending, otherBefore.HasBackup));
-        Assert.Equal(PatchOutcome.Installed, Single(other.Apply(CreateManifest(), TagsAndBadges, _assets)).Outcome);
+        Assert.Equal(PatchOutcome.Installed, IconEntry(other.Apply(CreateManifest(), TagsAndBadges, _assets)).Outcome);
 
-        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
-        Assert.Equal(PatchReason.UpToDate, Single(other.GetStatus(CreateManifest(), TagsAndBadges)).Reason);
-        Assert.Equal(PatchOutcome.Restored, Single(other.Restore()).Outcome);
+        Assert.Equal(PatchReason.UpToDate, IconEntry(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchReason.UpToDate, IconEntry(other.GetStatus(CreateManifest(), TagsAndBadges)).Reason);
+        Assert.Equal(PatchOutcome.Restored, IconEntry(other.Restore()).Outcome);
         Assert.Equal(_original, _fileSystem.ReadAllBytes(otherIcon));
         Assert.Equal(Build(Tags), _fileSystem.ReadAllBytes(ClientPath));
-        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchReason.UpToDate, IconEntry(_installer.GetStatus(CreateManifest(), Tags)).Reason);
     }
 
     [Fact]
@@ -455,7 +456,7 @@ public class PatchInstallerTests
         _installer.Apply(CreateManifest(), Tags, _assets);
         var sameFolder = new PatchInstaller(new InstallerOptions(@"c:\CLIENT\", @"C:\data"), _fileSystem, _processes);
 
-        Assert.Equal(PatchReason.UpToDate, Single(sameFolder.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchReason.UpToDate, IconEntry(sameFolder.GetStatus(CreateManifest(), Tags)).Reason);
         Assert.Equal(new InstallerOptions(@"c:\CLIENT\", @"C:\data").ClientId, _options.ClientId);
         Assert.Equal(16, _options.ClientId.Length);
     }
@@ -470,15 +471,15 @@ public class PatchInstallerTests
             """;
         _fileSystem.Seed(_options.StatePath, System.Text.Encoding.UTF8.GetBytes(legacy));
 
-        Assert.Equal(PatchReason.UpToDate, Single(_installer.GetStatus(CreateManifest(), Tags)).Reason);
-        Assert.Equal(PatchOutcome.Rebuilt, Single(_installer.Apply(CreateManifest(), TagsAndBadges, _assets)).Outcome);
+        Assert.Equal(PatchReason.UpToDate, IconEntry(_installer.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchOutcome.Rebuilt, IconEntry(_installer.Apply(CreateManifest(), TagsAndBadges, _assets)).Outcome);
 
         System.Text.Json.Nodes.JsonObject saved = System.Text.Json.Nodes.JsonNode.Parse(_fileSystem.ReadAllBytes(_options.StatePath))!.AsObject();
         Assert.False(saved.ContainsKey("files"));
         Assert.Equal(new[] { _options.ClientKey }, saved["clients"]!.AsObject().Select(client => client.Key));
         var other = new PatchInstaller(new InstallerOptions(@"C:\other", @"C:\data"), _fileSystem, _processes);
         _fileSystem.Seed(Path.Combine(@"C:\other", "SysTextures", "Icon.utx"), _original);
-        Assert.Equal(PatchReason.NotInstalled, Single(other.GetStatus(CreateManifest(), Tags)).Reason);
+        Assert.Equal(PatchReason.NotInstalled, IconEntry(other.GetStatus(CreateManifest(), Tags)).Reason);
     }
 
     [Fact]
@@ -487,13 +488,13 @@ public class PatchInstallerTests
         _fileSystem.Seed(_options.StatePath, "{ }"u8.ToArray());
 
         Assert.Throws<InvalidDataException>(() => _installer.GetStatus(CreateManifest(), Tags));
-        Assert.Equal(PatchOutcome.Failed, Single(_installer.Apply(CreateManifest(), Tags, _assets)).Outcome);
+        Assert.Equal(PatchOutcome.Failed, IconEntry(_installer.Apply(CreateManifest(), Tags, _assets)).Outcome);
         Assert.Equal(_original, _fileSystem.ReadAllBytes(ClientPath));
     }
 
     private static (PatchOutcome Outcome, PatchReason Reason) Describe(IReadOnlyList<PatchFileResult> results)
     {
-        PatchFileResult result = Single(results);
+        PatchFileResult result = IconEntry(results);
         return (result.Outcome, result.Reason);
     }
 
@@ -527,12 +528,36 @@ public class PatchInstallerTests
     {
         Manifest source = manifest ?? CreateManifest();
         IconPackage package = TestIcons.Open(_original);
-        return OperationComposer.Build(package, source.GetOperations(Icon, packs), _assets).Replacement.FileBytes;
+        return OperationComposer.Build(package, source.GetOperations(Icon, packs).OfType<IIconOperation>().ToList(), _assets).Replacement.FileBytes;
     }
 
-    private static T Single<T>(IReadOnlyList<T> items)
+    /// <summary>The Icon.utx entry. The test client has no effect packages and nothing selected changes them, so
+    /// their entries only report the missing file (or the same failure or block as every file).</summary>
+    private static PatchFileResult IconEntry(IReadOnlyList<PatchFileResult> results)
     {
-        Assert.Single(items);
-        return items[0];
+        Assert.Equal(ClientFiles.Patchable, results.Select(result => result.FileName));
+        PatchFileResult icon = results[0];
+        foreach (PatchFileResult other in results.Skip(1))
+        {
+            Assert.True(other.Outcome is PatchOutcome.Skipped or PatchOutcome.Blocked or PatchOutcome.Failed, $"{other.FileName}: {other.Outcome}");
+            if (other.Outcome == PatchOutcome.Failed)
+            {
+                Assert.Equal(PatchOutcome.Failed, icon.Outcome);
+            }
+        }
+
+        return icon;
+    }
+
+    private static PatchFileStatus IconEntry(IReadOnlyList<PatchFileStatus> statuses)
+    {
+        Assert.Equal(ClientFiles.Patchable, statuses.Select(status => status.FileName));
+        foreach (PatchFileStatus other in statuses.Skip(1))
+        {
+            Assert.Equal(PatchFileState.Missing, other.State);
+            Assert.Equal(PendingAction.None, other.Pending);
+        }
+
+        return statuses[0];
     }
 }

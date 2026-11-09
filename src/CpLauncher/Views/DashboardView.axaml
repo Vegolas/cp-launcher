@@ -20,7 +20,7 @@
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
           <Button Classes="ghost" Command="{Binding RefreshCommand}" WindowDecorationProperties.ElementRole="User"
-                  ToolTip.Tip="Pobiera przepisy jeszcze raz i sprawdza Icon.utx.">
+                  ToolTip.Tip="Pobiera przepisy jeszcze raz i sprawdza pliki klienta.">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBlock Classes="glyph" Text="&#xE72C;" />
               <TextBlock Text="Odśwież" VerticalAlignment="Center" />
@@ -87,7 +87,7 @@
         <Image Name="Guide" Height="250" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="36,0,0,0"
                Source="{x:Static views:Art.Guide}" IsHitTestVisible="False" />
 
-        <!-- Status of Icon.utx and the actions on it, said by the guide; the last line is the result of the last action -->
+        <!-- Status of the client files and the actions on them, said by the guide; the last line is the result of the last action -->
         <HeaderedContentControl Name="StatusDialog" Theme="{StaticResource GuideDialog}"
                                 Width="440" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="240,24,24,28"
                                 Padding="18,13,18,14"
@@ -104,7 +104,7 @@
               <Button Classes="apply" Content="ZASTOSUJ" Command="{Binding ApplyCommand}" />
               <Button Classes="quiet" Content="Przywróć oryginał" Command="{Binding RestoreOriginalCommand}"
                       IsVisible="{Binding HasOriginalToRestore}"
-                      ToolTip.Tip="Przywraca kopię oryginalnego Icon.utx zrobioną przed pierwszą zmianą." />
+                      ToolTip.Tip="Przywraca kopie oryginalnych plików klienta zrobione przed pierwszą zmianą." />
             </StackPanel>
             <Border Margin="0,12,0,0" Padding="0,10,0,0" BorderBrush="#1E252F" BorderThickness="0,1,0,0">
               <Border.IsVisible>
@@ -204,7 +204,7 @@
                               BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,10,0,0">
                         <StackPanel>
                           <Grid ColumnDefinitions="*,Auto">
-                            <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsEditable}" MinHeight="0">
+                            <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding IsEditable}" MinHeight="0">
                               <TextBlock Classes="strong" FontSize="14.5" Text="{Binding Name}" TextWrapping="Wrap" />
                             </CheckBox>
                             <Border Grid.Column="1" Classes="count" Margin="12,0,0,0">
@@ -214,7 +214,50 @@
                           <TextBlock Classes="muted" FontSize="12.5" LineHeight="17" TextWrapping="Wrap" Margin="28,2,0,0"
                                      Text="{Binding Description}"
                                      IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                          <StackPanel Classes="strip" Orientation="Horizontal" Margin="28,10,0,0">
+                          <!-- A pack with options: one checkbox per option, with the icons of the skills it is about -->
+                          <ItemsControl ItemsSource="{Binding Options}" Margin="28,10,0,0" IsVisible="{Binding HasOptions}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <WrapPanel ItemWidth="300" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:PackOptionViewModel">
+                                <Border Classes="option" Classes.off="{Binding !IsSelected}" Margin="0,0,12,8">
+                                  <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding IsEditable}" MinHeight="0"
+                                            VerticalContentAlignment="Center">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                      <ItemsControl ItemsSource="{Binding Thumbnails}" VerticalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                          <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                          </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                          <DataTemplate x:DataType="vm:ThumbnailViewModel">
+                                            <Border Classes="iconslot" ToolTip.Tip="{Binding Target}">
+                                              <Panel>
+                                                <Image Width="32" Height="32" Stretch="Fill"
+                                                       RenderOptions.BitmapInterpolationMode="None"
+                                                       Source="{Binding Image, Converter={x:Static views:RgbaImageConverter.Instance}}" />
+                                                <Border Classes="flash" />
+                                              </Panel>
+                                            </Border>
+                                          </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                      </ItemsControl>
+                                      <StackPanel Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted small" TextWrapping="Wrap" Text="{Binding Description}"
+                                                   IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                      </StackPanel>
+                                    </Grid>
+                                  </CheckBox>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <StackPanel Classes="strip" Orientation="Horizontal" Margin="28,10,0,0" IsVisible="{Binding !HasOptions}">
                             <ItemsControl ItemsSource="{Binding Thumbnails}">
                               <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>

@@ -7,54 +7,80 @@
 // Everything goes under <out>, which must be inside a work\ folder (gitignored, where copies of game files live)
 // and must not be a real client folder.
 //
-//   dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir> [--launcher <version> <exe>]   (from the repository root)
+//   dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir> [--launcher <version> <exe>] [--effects <dir>]
+//   (from the repository root)
 //
 // --launcher offers <exe> as launcher <version> (copied to source\launcher\, hashed into the manifest), for
 // checking the self-update; serve the source over http://127.0.0.1 then, folders cannot deliver updates.
+// --effects takes the original LineageSkillEffect.u and LineageEffect.u from <dir> (e.g. work\original-effects):
+// they are copied into the fake client's system_season and the effect packs (icons over the target, effect swaps,
+// gold click arrow) are added from mappings\debuff-icons.txt and mappings\effect-swaps.txt.
 //
 // Result:
 //   <out>\source\  manifest.json, manifest.json.sig, dev-public.pem, assets\<sha256>.png[, launcher\CpLauncher-<version>.exe]
 //   <out>\client\  SysTextures\Icon.utx (copy), system_season\L2.exe (dummy), system_season\Option.ini, FAKE-CLIENT.txt
+//                 [, system_season\LineageSkillEffect.u and LineageEffect.u (copies)]
 //
 // Start the launcher against it:
 //   CpLauncher.exe --data <out>\data --client <out>\client --source <out>\source --dev-public-key <out>\source\dev-public.pem
 
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Text.Json;
 using L2Mod.Core;
+using L2Mod.Core.Effects;
 using L2Mod.Core.Imaging;
+using L2Mod.Core.Ini;
 using L2Mod.Core.Manifests;
 using L2Mod.Core.Operations;
 using L2Mod.Core.Packages;
+using L2Mod.Core.Publishing;
 using L2Mod.Core.Recipes;
 using L2Mod.Core.Signing;
 using L2Mod.Core.Updates;
 
 const string FakeMarker = "FAKE-CLIENT.txt";
 
-bool withLauncher = args.Length == 5 && args[2] == "--launcher";
-if (args.Length != 2 && !withLauncher)
+var positional = new List<string>();
+string? launcherVersionText = null;
+string? launcherPath = null;
+string? effectsDirectory = null;
+for (int i = 0; i < args.Length; i++)
 {
-    Console.Error.WriteLine("usage: dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir> [--launcher <version> <exe>]");
+    if (args[i] == "--launcher" && i + 2 < args.Length)
+    {
+        launcherVersionText = args[++i];
+        launcherPath = args[++i];
+    }
+    else if (args[i] == "--effects" && i + 1 < args.Length)
+    {
+        effectsDirectory = Path.GetFullPath(args[++i]);
+    }
+    else
+    {
+        positional.Add(args[i]);
+    }
+}
+
+if (positional.Count != 2)
+{
+    Console.Error.WriteLine("usage: dotnet run scripts/New-DevSource.cs -- <original Icon.utx> <out dir> [--launcher <version> <exe>] [--effects <dir>]");
     return 1;
 }
 
-string iconPath = Path.GetFullPath(args[0]);
-string outDirectory = Path.GetFullPath(args[1]);
+string iconPath = Path.GetFullPath(positional[0]);
+string outDirectory = Path.GetFullPath(positional[1]);
 LauncherRelease? launcher = null;
 byte[]? launcherBytes = null;
-if (withLauncher)
+if (launcherVersionText is not null && launcherPath is not null)
 {
-    if (!LauncherVersion.TryParse(args[3], out LauncherVersion? launcherVersion))
+    if (!LauncherVersion.TryParse(launcherVersionText, out LauncherVersion? launcherVersion))
     {
-        Console.Error.WriteLine($"'{args[3]}' is not a launcher version like 1.0.1.");
+        Console.Error.WriteLine($"'{launcherVersionText}' is not a launcher version like 1.0.1.");
         return 1;
     }
 
-    launcherBytes = File.ReadAllBytes(Path.GetFullPath(args[4]));
+    launcherBytes = File.ReadAllBytes(Path.GetFullPath(launcherPath));
     launcher = new LauncherRelease(launcherVersion.ToString(), $"launcher/CpLauncher-{launcherVersion}.exe", ContentHash.Sha256Hex(launcherBytes));
 }
+
 string mappings = Path.Combine(Directory.GetCurrentDirectory(), "mappings");
 if (!Directory.Exists(mappings))
 {
@@ -81,37 +107,72 @@ string originalHash = ContentHash.Sha256Hex(original);
 byte[] markPng = PngCodec.Encode(DrawMark());
 string markHash = ContentHash.Sha256Hex(markPng);
 string markPath = $"assets/{markHash}.png";
-var marks = new List<IIconOperation>();
+var marks = new List<IPatchOperation>();
 foreach (string target in new[] { "etc_i.etc_cobol_seed_i01", "etc_i.etc_reaper_i00", "etc_i.etc_dice_d_i00" })
 {
     marks.Add(new OverlayOperation(ClientFiles.IconUtx, target, markPath, markHash, OverlayOperation.DefaultCorner));
 }
 
-var packs = new List<(string Id, string Name, string Description, bool Default, IReadOnlyList<IIconOperation> Operations)>
+var packs = new List<Pack>
 {
-    ("dance-song-badges", "Znaczki tańców i pieśni", "Ikony tańców i pieśni dostają w prawym dolnym rogu miniaturę buffa o tym samym działaniu.",
-        true, MappingOperations.LoadBadges(Path.Combine(mappings, "dances-songs.txt"))),
-    ("chant-badges", "Znaczki czantów i Overlorda", "Czanty Warcryera i buffy Overlorda dostają w prawym dolnym rogu miniaturę odpowiadającego buffa Propheta.",
-        true, MappingOperations.LoadBadges(Path.Combine(mappings, "chants.txt"))),
-    ("debuff-tags", "Tagi debuffów", "Kolorowy kwadrat w lewym górnym rogu ikony debuffu: czerwony – kontrola (stun, sen, unieruchomienie, strach, cisza), fioletowy – obrażenia w czasie, pomarańczowy – osłabienie statystyk.",
-        true, MappingOperations.LoadDebuffTags(Path.Combine(mappings, "debuff-tags.txt"))),
-    ("item-marks-dev", "Oznaczenia przedmiotów (test)", "Żółty romb na ikonach trzech przedmiotów – paczka tylko do testów launchera.",
-        false, marks),
+    new Pack("dance-song-badges", "Znaczki tańców i pieśni", true, MappingOperations.LoadBadges(Path.Combine(mappings, "dances-songs.txt")),
+        "Ikony tańców i pieśni dostają w prawym dolnym rogu miniaturę buffa o tym samym działaniu."),
+    new Pack("chant-badges", "Znaczki czantów i Overlorda", true, MappingOperations.LoadBadges(Path.Combine(mappings, "chants.txt")),
+        "Czanty Warcryera i buffy Overlorda dostają w prawym dolnym rogu miniaturę odpowiadającego buffa Propheta."),
+    new Pack("debuff-tags", "Tagi debuffów", true, MappingOperations.LoadDebuffTags(Path.Combine(mappings, "debuff-tags.txt")),
+        "Kolorowy kwadrat w lewym górnym rogu ikony debuffu: czerwony – kontrola (stun, sen, unieruchomienie, strach, cisza), fioletowy – obrażenia w czasie, pomarańczowy – osłabienie statystyk."),
+    new Pack("item-marks-dev", "Oznaczenia przedmiotów (test)", false, marks,
+        "Żółty romb na ikonach trzech przedmiotów – paczka tylko do testów launchera."),
 };
+
+var originals = new Dictionary<string, IReadOnlyList<string>> { [ClientFiles.IconUtx] = new[] { originalHash } };
+var effectFiles = new Dictionary<string, byte[]>();
+if (effectsDirectory is not null)
+{
+    foreach (string file in new[] { ClientFiles.LineageSkillEffect, ClientFiles.LineageEffect })
+    {
+        effectFiles[file] = File.ReadAllBytes(Path.Combine(effectsDirectory, file));
+        originals[file] = new[] { ContentHash.Sha256Hex(effectFiles[file]) };
+    }
+
+    var icons = EffectMappings.LoadTargetIcons(Path.Combine(mappings, "debuff-icons.txt"))
+        .Select(entry => new PackOption(entry.Id, entry.Label.Name, false, new IPatchOperation[] { entry.Operation }, entry.Label.Description))
+        .ToList();
+    var swaps = EffectMappings.LoadSwaps(Path.Combine(mappings, "effect-swaps.txt"))
+        .Select(entry => new PackOption(entry.Id, entry.Label.Name, false, new IPatchOperation[] { entry.Operation }, entry.Label.Description))
+        .ToList();
+    packs.Add(Pack.WithOptions("target-icons", "Ikony nad celem", false, icons,
+        "Ikona umiejętności unosi się nad głową celu, gdy umiejętność go trafi. To nie jest wskaźnik debuffa: pokazuje się też przy odporności (resist) i znika po 5 s."));
+    packs.Add(Pack.WithOptions("skill-effect-swaps", "Zamiana efektów umiejętności", false, swaps,
+        "Dwie umiejętności zamieniają się wyglądem w obie strony."));
+    packs.Add(new Pack("gold-click-arrow", "Złota strzałka ruchu", false, new IPatchOperation[] { new GoldClickArrowOperation() },
+        "Strzałka w miejscu kliknięcia przy chodzeniu jest złota zamiast niebieskiej."));
+}
 
 var assets = new SingleAsset(markPath, markPng);
 var package = new IconPackage("Icon", L2File.FromBytes(original));
-var all = packs.SelectMany(pack => pack.Operations).ToList();
+var all = packs.SelectMany(pack => pack.Operations).OfType<IIconOperation>().ToList();
 OperationBuildResult build = OperationComposer.Build(package, all, assets);
-Console.WriteLine($"{all.Count} operations build on {Path.GetFileName(iconPath)} ({build.Warnings.Count} warnings).");
-
-byte[] manifest = WriteManifest(originalHash, packs, launcher);
-ManifestReadResult parsed = ManifestParser.Parse(manifest);
-if (parsed.Messages.Count > 0 || parsed.Manifest.Packs.Count != packs.Count)
+Console.WriteLine($"{all.Count} icon operations build on {Path.GetFileName(iconPath)} ({build.Warnings.Count} warnings).");
+foreach ((string file, byte[] bytes) in effectFiles)
 {
-    Console.Error.WriteLine("The dev manifest does not round-trip: " + string.Join("; ", parsed.Messages));
-    return 1;
+    var operations = packs.SelectMany(pack => pack.Operations).OfType<IEffectOperation>().Where(operation => operation.File == file).ToList();
+    EffectComposer.Build(file, bytes, operations, () =>
+    {
+        return package;
+    });
+    Console.WriteLine($"{operations.Count} effect operations build on {file}.");
 }
+
+var announcements = new List<Announcement>
+{
+    new Announcement(new DateOnly(2026, 10, 19), "Wersja deweloperska", "Manifest testowy z mapowań w repozytorium.\nPodpisany jednorazowym kluczem – nie do użytku w CP."),
+    new Announcement(new DateOnly(2026, 10, 18), "Starsze ogłoszenie", "Zwykły tekst, <b>bez HTML</b>."),
+};
+var presets = new List<OptionPreset> { new OptionPreset("mass-pvp", "Masowe PvP", new[] { new IniValue("Video", "EffectDetail", "0") }) };
+var manifestModel = new Manifest(1, DateTime.Now.ToString("yyyy.MM.dd.HHmm"), true, launcher, originals, announcements, packs, presets);
+byte[] manifest = ManifestWriter.WriteChecked(manifestModel);
+ManifestReadResult parsed = ManifestParser.Parse(manifest);
 
 SigningKeyPair key = ManifestSignature.GenerateKeyPair();
 byte[] signature = ManifestSignature.Sign(manifest, key.PrivateKeyPem);
@@ -135,6 +196,10 @@ File.WriteAllText(Path.Combine(clientDirectory, FakeMarker), "Fake L2Dex client 
 File.WriteAllBytes(Path.Combine(clientDirectory, "SysTextures", "Icon.utx"), original);
 File.WriteAllText(Path.Combine(clientDirectory, "system_season", "L2.exe"), "not a real executable\r\n");
 File.WriteAllText(Path.Combine(clientDirectory, "system_season", "Option.ini"), "[Video]\r\nEffectDetail=2\r\nTextureDetail=1\r\n");
+foreach ((string file, byte[] bytes) in effectFiles)
+{
+    File.WriteAllBytes(Path.Combine(clientDirectory, ClientFiles.GetRelativePath(file)), bytes);
+}
 
 Console.WriteLine($"Source: {sourceDirectory} (manifest {parsed.Manifest.Version}, {packs.Count} packs)");
 Console.WriteLine($"Fake client: {clientDirectory}");
@@ -182,117 +247,6 @@ static RgbaImage DrawMark()
     }
 
     return image;
-}
-
-static byte[] WriteManifest(string originalHash, IReadOnlyList<(string Id, string Name, string Description, bool Default, IReadOnlyList<IIconOperation> Operations)> packs, LauncherRelease? launcher)
-{
-    using var stream = new MemoryStream();
-    var options = new JsonWriterOptions { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-    using (var writer = new Utf8JsonWriter(stream, options))
-    {
-        writer.WriteStartObject();
-        writer.WriteNumber("schema", 1);
-        writer.WriteString("version", DateTime.Now.ToString("yyyy.MM.dd.HHmm"));
-        writer.WriteBoolean("enabled", true);
-        if (launcher is not null)
-        {
-            writer.WriteStartObject("launcher");
-            writer.WriteString("version", launcher.Version);
-            writer.WriteString("url", launcher.Url);
-            writer.WriteString("sha256", launcher.Sha256);
-            writer.WriteEndObject();
-        }
-        writer.WriteStartObject("supportedOriginals");
-        writer.WriteStartArray(ClientFiles.IconUtx);
-        writer.WriteStringValue(originalHash);
-        writer.WriteEndArray();
-        writer.WriteEndObject();
-        writer.WriteStartArray("announcements");
-        WriteAnnouncement(writer, "2026-10-19", "Wersja deweloperska", "Manifest testowy z mapowań w repozytorium.\nPodpisany jednorazowym kluczem – nie do użytku w CP.");
-        WriteAnnouncement(writer, "2026-10-18", "Starsze ogłoszenie", "Zwykły tekst, <b>bez HTML</b>.");
-        writer.WriteEndArray();
-        writer.WriteStartArray("packs");
-        foreach ((string id, string name, string description, bool isDefault, IReadOnlyList<IIconOperation> operations) in packs)
-        {
-            writer.WriteStartObject();
-            writer.WriteString("id", id);
-            writer.WriteString("name", name);
-            writer.WriteString("description", description);
-            writer.WriteBoolean("default", isDefault);
-            writer.WriteStartArray("operations");
-            foreach (IIconOperation operation in operations)
-            {
-                WriteOperation(writer, operation);
-            }
-
-            writer.WriteEndArray();
-            writer.WriteEndObject();
-        }
-
-        writer.WriteEndArray();
-        writer.WriteStartArray("optionPresets");
-        writer.WriteStartObject();
-        writer.WriteString("id", "mass-pvp");
-        writer.WriteString("name", "Masowe PvP");
-        writer.WriteStartObject("values");
-        writer.WriteStartObject("Video");
-        writer.WriteString("EffectDetail", "0");
-        writer.WriteEndObject();
-        writer.WriteEndObject();
-        writer.WriteEndObject();
-        writer.WriteEndArray();
-        writer.WriteEndObject();
-    }
-
-    return stream.ToArray();
-}
-
-static void WriteAnnouncement(Utf8JsonWriter writer, string date, string title, string text)
-{
-    writer.WriteStartObject();
-    writer.WriteString("date", date);
-    writer.WriteString("title", title);
-    writer.WriteString("text", text);
-    writer.WriteEndObject();
-}
-
-static void WriteOperation(Utf8JsonWriter writer, IIconOperation operation)
-{
-    writer.WriteStartObject();
-    writer.WriteString("op", operation.Kind);
-    writer.WriteString("file", operation.File);
-    writer.WriteString("target", operation.Target);
-    switch (operation)
-    {
-        case BadgeOperation badge:
-        {
-            writer.WriteString("badge", badge.Badge);
-            writer.WriteNumber("size", badge.Style.Size);
-            break;
-        }
-
-        case TagOperation tag:
-        {
-            writer.WriteString("color", tag.Color.ToString());
-            writer.WriteNumber("size", tag.Size);
-            break;
-        }
-
-        case OverlayOperation overlay:
-        {
-            writer.WriteString("image", overlay.Image);
-            writer.WriteString("imageSha256", overlay.ImageSha256);
-            break;
-        }
-
-        default:
-        {
-            throw new NotSupportedException(operation.Kind);
-        }
-    }
-
-    writer.WriteString("corner", IconCorners.ToCode(operation.Corner));
-    writer.WriteEndObject();
 }
 
 sealed class SingleAsset : IAssetStore

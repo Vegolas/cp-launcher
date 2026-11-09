@@ -1,21 +1,23 @@
-# EXPERIMENT 2026-11-08 - skills whose icon floats above the target's head when the skill is cast.
-# Used by scripts/New-EffectsExperiment.cs (--icons). The icon is a pre-flipped copy of Icon_h.skill_i.skill<id>
-# shown by a new effect added to the skill's ShotAction in LineageSkillEffect.u, so it plays on every cast that
-# reaches the target (also when a debuff is resisted) and stays for a fixed time, not for the debuff's real duration.
-# Format: <skill id> [seconds] [@<effect class id>]  # name
+# Icons over the target (pack "target-icons"): the skill's icon floats up over the target's head when the skill is
+# cast. One choice per line for the members: <skill id> [seconds] [@<effect class id>]  # name | optional description
+# The icon is a flipped copy of the member's own Icon.utx skill_i.skill<id>, shown by a new effect added to the skill's
+# ShotAction in LineageSkillEffect.u, so it plays on every cast that reaches the target (also when a debuff is
+# resisted) and stays for a fixed time (default 5 s), not for the debuff's real duration.
 # @<id>: the game plays this skill through l2_<id>_skill instead of its own class. Every other skill playing that
 # class shows the icon too. The client picks a skill's class elsewhere (probably skillgrp.dat, out of scope), so a
 # skill without its own class needs @<id>: a new l2_<id>_skill class for it is never played (Noblesse Blessing and
-# Slow, 2026-11-08). The class number comes from the probe build (work\out\effects-probe), which shows it over the
-# target. Probe results 2026-11-09: Noblesse Blessing 1048, Slow and Curse Poison 1168, Arcane Chaos and Sleep 1069.
+# Slow, 2026-11-08), and the build refuses it. The class number comes from a probe build (scripts/New-EffectsExperiment.cs
+# --probe), which shows it over the target. Probe results 2026-11-09: Noblesse Blessing 1048, Slow and Curse Poison
+# 1168, Arcane Chaos and Sleep 1069.
 # Not on L2Dex (no icon or effect class): 1224 Surrender to Poison, 1383-1385 Mass Surrender to Fire/Water/Wind.
 
 1071  # Surrender to Water
 1074  # Surrender to Wind
 1083  # Surrender to Fire
 1223  # Surrender to Earth
-1056  # Cancellation (works in game)
-1323 @1048  # Noblesse Blessing: plays Bless the Soul's class (wh_bless_the_soul_ta), so Bless the Soul shows it too
+1056  # Cancellation
+# Noblesse Blessing plays Bless the Soul's class (wh_bless_the_soul_ta), so Bless the Soul shows the icon too.
+1323 @1048  # Noblesse Blessing | Ta sama ikona pokaże się też po Bless the Soul – gra używa dla obu tego samego efektu.
 1016  # Resurrection
 1398  # Mana Burn
 1399  # Mana Storm

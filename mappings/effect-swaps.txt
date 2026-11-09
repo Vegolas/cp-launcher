@@ -1,0 +1,7 @@
+# Skill effect swaps (pack "skill-effect-swaps"), each pair both ways, one choice per line for the members:
+# <skill a> <skill b>  # name | optional description
+# The class names l2_<a>_skill and l2_<b>_skill swap places in LineageSkillEffect.u's name table, and so do their
+# SkillID defaults; tested in game 2026-11-08. Each skill can be in one pair only.
+
+1235 1175  # Hydro Blast ↔ Aqua Swirl | Hydro Blast wygląda jak Aqua Swirl, a Aqua Swirl jak Hydro Blast.
+1230 1220  # Prominence ↔ Blaze | Prominence wygląda jak Blaze, a Blaze jak Prominence.

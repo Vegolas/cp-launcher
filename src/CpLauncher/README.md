@@ -21,11 +21,15 @@ the install state machine and the self-update are L2Mod.Core.
   only "Uruchom L2Dex" in the title bar and "Dalej" on the first page; outlined gold (`apply`) is a page's own
   action. The window extends into a 56 px title bar (`ExtendClientAreaToDecorationsHint`): every page draws its
   own `Border.titlebar`, Avalonia's drawn decorations keep only minimize/maximize/close. The dashboard's hero
-  shows the Icon.utx state and the result of the last action in the guide's dialog (`GuideDialog` theme; its gem
-  is gold while `HasPendingChanges`). Launcher settings and technical details are a second screen of the
+  shows the state of the client files and the result of the last action in the guide's dialog (`GuideDialog`
+  theme; its gem is gold while `HasPendingChanges`). Icon.utx is always described; an effect package
+  (system_season) only when the selection changes it, our patch is in it or something is pending
+  (`StatusTexts.IsRelevant`), so members without effect packs see the same texts as before. Launcher settings and technical details are a second screen of the
   dashboard (`IsSettingsOpen`). Paczki, Ogłoszenia and Ustawienia gry are `Expander`s with the `SectionExpander`
   theme; collapsed ones are remembered in settings.json (`collapsedSections`) and show a one-line summary.
-  Pack previews are up to 6 icons at 1:1 plus a "+N" slot.
+  Pack previews are up to 6 icons at 1:1 plus a "+N" slot. A pack with options (icons over the target, effect
+  swaps) shows one checkbox per option with the icons of its skills; the pack's own checkbox is all / some / none
+  and sets all of them. Option choices are stored in `packSelection` as `<pack id>/<option id>`.
 - `Assets/Art/` – pictures of the pages, loaded by `Views/Art.cs`; each is optional (a build without the folder
   has no pictures but works). `dragon.jpg` and `dwarf.png` are stored already mirrored.
 - `Views/Effects.cs` – the only animations: art fading in on load, the dialog's gem flashing when the state
@@ -36,7 +40,8 @@ the install state machine and the self-update are L2Mod.Core.
 
 ## Data
 `%LocalAppData%\CpLauncher\`: `settings.json`, `state.json` (one section per client folder),
-`backups\<sha256>\Icon.utx` (shared, named by the original's hash), `backups\clients\<client id>\Option.ini`,
+`backups\<sha256>\<file>` (Icon.utx, LineageSkillEffect.u, LineageEffect.u; shared, named by the original's
+hash), `backups\clients\<client id>\Option.ini`,
 `cache\manifest.json(.sig)`, `cache\assets\`, `launcher.log`. `--data <dir>` or `CPLAUNCHER_DATA` point it
 elsewhere.
 
@@ -61,7 +66,10 @@ dotnet run scripts/New-DevSource.cs -- <copy of the original Icon.utx> work/e2e
 dotnet run --project src/CpLauncher -- --data work/e2e/data --client work/e2e/client --source work/e2e/source --dev-public-key work/e2e/source/dev-public.pem
 ```
 The script signs with a throwaway key (the private half is never written) and refuses folders outside `work\`.
-`--launcher <version> <exe>` adds a launcher release to the dev source.
+`--launcher <version> <exe>` adds a launcher release to the dev source. `--effects <dir>` copies the original
+`LineageSkillEffect.u` and `LineageEffect.u` from `<dir>` (e.g. `work/original-effects`) into the fake client and
+adds the effect packs (icons over the target and effect swaps with options, gold click arrow). Use full paths for
+`--source` and friends: a relative source is rejected.
 `--smoke <report.txt>` applies and restores the selected packs, tries the first preset, writes a report plus
 window PNGs and exits. `--smoke-update <report.txt>` reports the offered update and clicks "Aktualizuj".
 

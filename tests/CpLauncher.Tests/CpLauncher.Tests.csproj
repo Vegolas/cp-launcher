@@ -27,6 +27,7 @@
     <Compile Include="..\L2Mod.Core.Tests\Fakes.cs" Link="Shared\Fakes.cs" />
     <Compile Include="..\L2Mod.Core.Tests\TestIcons.cs" Link="Shared\TestIcons.cs" />
     <Compile Include="..\L2Mod.Core.Tests\TestPackageBuilder.cs" Link="Shared\TestPackageBuilder.cs" />
+    <Compile Include="..\L2Mod.Core.Tests\TestEffectPackages.cs" Link="Shared\TestEffectPackages.cs" />
     <Compile Include="..\L2Mod.Core.Tests\Updates\UpdateFakes.cs" Link="Shared\UpdateFakes.cs" />
   </ItemGroup>
 

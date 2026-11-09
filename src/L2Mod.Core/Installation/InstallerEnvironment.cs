@@ -120,7 +120,7 @@ public static class GameProcesses
 /// <summary>
 /// Where the launcher keeps its data and where the client files are. One data folder can serve several client
 /// folders: state.json keeps a section per <see cref="ClientKey"/> and the Option.ini backup lives in a folder
-/// per <see cref="ClientId"/>; the Icon.utx backups are shared (named by the original's hash).
+/// per <see cref="ClientId"/>; the backups of the patched client files are shared (named by the original's hash).
 /// </summary>
 public sealed record InstallerOptions(string ClientDirectory, string DataDirectory)
 {
@@ -198,7 +198,8 @@ public sealed record InstallerOptions(string ClientDirectory, string DataDirecto
         return Path.Combine(ClientDirectory, ClientFiles.GetRelativePath(fileName));
     }
 
-    /// <summary>backups\&lt;sha256&gt;\Icon.utx – keeps the file name, which Ver121 decryption depends on.</summary>
+    /// <summary>backups\&lt;sha256&gt;\&lt;file&gt; (Icon.utx, LineageSkillEffect.u, …) – keeps the file name, which
+    /// Ver121 decryption depends on.</summary>
     public string GetBackupPath(string fileName, string sha256)
     {
         return Path.Combine(BackupDirectory, sha256.ToLowerInvariant(), fileName);

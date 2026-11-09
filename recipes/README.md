@@ -7,15 +7,18 @@ see `..\.docs\cp-launcher-v1-plan.md` → "Format dystrybucyjny"). Members' laun
 
 ```
 dotnet run --project src/L2Mod.Cli -- keygen                      # once; private key -> %USERPROFILE%\.l2mod\, public -> keys/
-dotnet run --project src/L2Mod.Cli -- build recipes work/original/Icon.utx dist [--overwrite]
+dotnet run --project src/L2Mod.Cli -- build recipes work/original dist [--overwrite]   # folder with the originals
 #   review work/preview/packs/<pack-id>.png (+ .txt index) before signing
 dotnet run --project src/L2Mod.Cli -- sign dist
 dotnet run --project src/L2Mod.Cli -- verify dist
 dotnet run --project src/L2Mod.Cli -- publish dist [--dry-run]    # release dist-<version> + GitHub Pages deployment
 ```
 
-- `build` needs the **unmodified** `Icon.utx` (named exactly that). Its SHA-256 becomes `supportedOriginals`;
-  members with any other `Icon.utx` get nothing applied until the recipes are rebuilt against it.
+- `build` needs the **unmodified** client files, named exactly as in the client: `Icon.utx` always (it also holds
+  the icons shown over the target), `LineageSkillEffect.u` and `LineageEffect.u` (from `system_season`) when an
+  effect pack changes them. Pass a folder holding them (`work/original`) or just `Icon.utx` when there are no
+  effect packs. Their SHA-256 become `supportedOriginals`; members with any other version of a file get nothing
+  applied to that file until the recipes are rebuilt against it.
 - Bump `version` whenever the recipes change (`build` warns when the manifest changed but the version did not).
 - Preview sheets show NCSoft icons: they go to `work/preview/packs` (or `--previews`), never into `dist/`.
 - `--overwrite` replaces an earlier build including its signature. A folder with any other file is refused.
@@ -68,14 +71,30 @@ the folder of `recipes.json`.
 | `id` | yes | lower-case letters, digits, dashes; stable – members' selections are stored by id |
 | `name` | yes | shown in the launcher (≤ 100 characters) |
 | `description` | no | shown in the launcher once it supports it (schema 1 launchers ignore it); string or array of lines |
-| `default` | no (`false`) | selected for new members |
-| `type` | yes | `badge`, `tag` or `overlay` |
-| `mapping` | yes | mapping file, one entry per line (below) |
-| `size` | no | badge: 20 (4–32), tag: 8 (4–16); multiple of 4 so only whole DXT1 blocks change |
-| `corner` | no | `br` `bl` `tr` `tl`; badge/overlay default `br`, tag default `tl` |
+| `default` | no (`false`) | selected for new members; for an effect pack with options, the default of every option |
+| `type` | yes | icon packs (Icon.utx): `badge`, `tag`, `overlay`; effect packs (system_season): `target-icon`, `effect-swap`, `gold-click-arrow` |
+| `mapping` | yes, except `gold-click-arrow` | mapping file, one entry per line (below) |
+| `size` | no, icon packs only | badge: 20 (4–32), tag: 8 (4–16); multiple of 4 so only whole DXT1 blocks change |
+| `corner` | no, icon packs only | `br` `bl` `tr` `tl`; badge/overlay default `br`, tag default `tl` |
 | `colors` | no, tag only | `{ "CC": "#E02020", "DOT": "#A040FF", "STAT": "#FF9900" }` (these are the defaults) |
 
 Badge packs always get a 1 px black border and no crop (that is all schema 1 can express).
+
+### Effect packs
+
+`target-icon` and `effect-swap` packs become packs **with options**: one checkbox per mapping line in the
+launcher (manifest `"options"` instead of `"operations"`, each with its own id, name, optional description and
+operations). Members' choices are stored per option (`<pack id>/<option id>`), so a line added later starts at
+the pack's `default` for everyone. `gold-click-arrow` is a plain pack with one operation.
+
+| Type | File | What it does |
+|---|---|---|
+| `target-icon` | `LineageSkillEffect.u` (appended) | the skill's icon floats up over the target's head for a few seconds when the game plays the skill's effect class on it – on **every** cast that reaches the target, also a resisted one; not a debuff indicator |
+| `effect-swap` | `LineageSkillEffect.u` (in place) | two skills swap their effects both ways (class names and SkillID defaults swap) |
+| `gold-click-arrow` | `LineageEffect.u` (in place) | the click-to-move arrow is gold instead of blue |
+
+The icons over the target are copies of the member's **own original** `Icon.utx` icons, so nothing from NCSoft is
+published. Launchers before 1.2.0 skip effect packs (with a note), so publish them with launcher 1.2.0 or later.
 
 ### Mapping files
 
@@ -90,6 +109,17 @@ Shared line format: `<key> <value>  # label`; blank lines and `#` lines are igno
 Overlay PNGs: ≤ 32×32 and ≤ 64 KB, 8-bit RGB/RGBA or indexed. `build` re-encodes them (drops editor
 metadata) and stores them as `dist/assets/<sha256>.png`.
 
+Effect mappings name the choice members see in the comment: `# name` or `# name | description`.
+
+| Type | Line | Example |
+|---|---|---|
+| `target-icon` | `<skill id> [seconds] [@<effect class id>]` (seconds 1–60, default 5) | `1323 @1048  # Noblesse Blessing \| Też po Bless the Soul.` |
+| `effect-swap` | `<skill a> <skill b>`, each skill in one pair only | `1235 1175  # Hydro Blast ↔ Aqua Swirl` |
+
+`@<id>`: the game plays the skill through `l2_<id>_skill` instead of a class of its own, and every skill playing
+that class shows the icon too. A skill without a class of its own needs it (`build` refuses a missing class);
+find the class number with a probe build (`scripts/New-EffectsExperiment.cs --probe`).
+
 The approved mappings live in `../mappings/` and are referenced from here, not copied.
 
 ## What build checks
@@ -98,4 +128,7 @@ The approved mappings live in `../mappings/` and are referenced from here, not c
   would skip (bad id, too long text, forbidden preset key, too many operations) fails the build;
 - every target and badge texture exists in the original; all packs are applied together exactly as the
   launcher would (size-preserving, verified by re-reading); same-corner overlaps are reported as warnings;
-- one before/after sheet per pack, the "after" decoded from the encoded file.
+- one before/after sheet per pack, the "after" decoded from the encoded file;
+- effect packs are applied to their originals too (every class of the built LineageSkillEffect.u must decode, every
+  icon must read back as its source flipped); the `target-icon` sheet shows each icon next to the icon as the built
+  file shows it over the target, the `effect-swap` sheet the two skills of each pair.

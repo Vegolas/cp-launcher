@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using L2Mod.Core.Badges;
+using L2Mod.Core.Effects;
 using L2Mod.Core.Imaging;
 using L2Mod.Core.Ini;
 using L2Mod.Core.Operations;
@@ -15,7 +16,7 @@ namespace L2Mod.Core.Manifests;
 /// Strict reader of manifest.json (schema 1); the bytes come from the network, so everything is checked.
 /// Problems with the envelope (schema, version, enabled, launcher, supportedOriginals, packs array) reject the
 /// whole manifest. A pack with an unknown op, an unknown field in an operation, a file outside the whitelist,
-/// bad values or too many operations is skipped with a message; so is a preset with a forbidden key
+/// bad values, a bad option or too many operations is skipped with a message; so is a preset with a forbidden key
 /// (GamePlayViewport*) or an announcement with bad values. Unknown top-level and pack fields are ignored,
 /// so later additions do not break older launchers. A manifest with another schema yields only the
 /// envelope (enabled, launcher) and no packs or presets.
@@ -38,6 +39,9 @@ public static partial class ManifestParser
     private static readonly string[] BadgeFields = { "op", "file", "target", "badge", "size", "corner" };
     private static readonly string[] TagFields = { "op", "file", "target", "color", "size", "corner" };
     private static readonly string[] OverlayFields = { "op", "file", "target", "image", "imageSha256", "corner" };
+    private static readonly string[] EffectSwapFields = { "op", "file", "skills" };
+    private static readonly string[] GoldClickArrowFields = { "op", "file" };
+    private static readonly string[] TargetIconFields = { "op", "file", "skill", "effectClass", "seconds" };
 
     public static ManifestReadResult Parse(byte[] json, ManifestLimits? limits = null)
     {
@@ -288,6 +292,10 @@ public static partial class ManifestParser
         return packs;
     }
 
+    /// <summary>
+    /// A pack has either "operations" (selected as a whole) or "options" (each selected on its own, with its own
+    /// operations); never both. The operation limit counts the operations of all options.
+    /// </summary>
     private static Pack ReadPack(JsonElement item, ManifestLimits limits)
     {
         RequireObject(item, "a pack");
@@ -295,6 +303,76 @@ public static partial class ManifestParser
         string name = GetRequiredText(item, "name", MaxNameLength, false);
         string? description = ReadDescription(item);
         bool isDefault = GetOptionalBool(item, "default", false);
+        bool hasOptions = item.TryGetProperty("options", out JsonElement optionsElement) && optionsElement.ValueKind != JsonValueKind.Null;
+        if (!hasOptions)
+        {
+            IReadOnlyList<IPatchOperation> operations = ReadOperations(item, limits.MaxOperationsPerPack, count =>
+            {
+                return $"it has {count} operations; the limit is {limits.MaxOperationsPerPack}";
+            });
+            return new Pack(id, name, isDefault, operations, description);
+        }
+
+        if (item.TryGetProperty("operations", out JsonElement operationsElement) && operationsElement.ValueKind != JsonValueKind.Null)
+        {
+            throw new FormatError("it has both operations and options");
+        }
+
+        RequireArray(optionsElement, "options");
+        int count = optionsElement.GetArrayLength();
+        if (count == 0)
+        {
+            throw new FormatError("it has no options");
+        }
+
+        if (count > limits.MaxOptionsPerPack)
+        {
+            throw new FormatError($"it has {count} options; the limit is {limits.MaxOptionsPerPack}", ManifestSkipReason.OverLimit);
+        }
+
+        var options = new List<PackOption>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        int remaining = limits.MaxOperationsPerPack;
+        foreach (JsonElement option in optionsElement.EnumerateArray())
+        {
+            string label = GetLabel(option, options.Count + 1);
+            try
+            {
+                PackOption read = ReadOption(option, isDefault, remaining, limits.MaxOperationsPerPack);
+                if (!ids.Add(read.Id))
+                {
+                    throw new FormatError("another option has the same id", ManifestSkipReason.DuplicateId);
+                }
+
+                remaining -= read.Operations.Count;
+                options.Add(read);
+            }
+            catch (FormatError error)
+            {
+                throw new FormatError($"option '{label}': {error.Message}", error.Reason);
+            }
+        }
+
+        return Pack.WithOptions(id, name, isDefault, options, description);
+    }
+
+    /// <summary>An option of a pack; its "default" falls back to the pack's.</summary>
+    private static PackOption ReadOption(JsonElement item, bool packDefault, int remainingOperations, int packLimit)
+    {
+        RequireObject(item, "an option");
+        string id = ReadId(item);
+        string name = GetRequiredText(item, "name", MaxNameLength, false);
+        string? description = ReadDescription(item);
+        bool isDefault = GetOptionalBool(item, "default", packDefault);
+        IReadOnlyList<IPatchOperation> operations = ReadOperations(item, remainingOperations, count =>
+        {
+            return $"the pack has more than {packLimit} operations in its options";
+        });
+        return new PackOption(id, name, isDefault, operations, description);
+    }
+
+    private static IReadOnlyList<IPatchOperation> ReadOperations(JsonElement item, int maxOperations, Func<int, string> overLimitMessage)
+    {
         JsonElement operationsElement = GetRequiredProperty(item, "operations");
         RequireArray(operationsElement, "operations");
         int count = operationsElement.GetArrayLength();
@@ -303,12 +381,12 @@ public static partial class ManifestParser
             throw new FormatError("it has no operations");
         }
 
-        if (count > limits.MaxOperationsPerPack)
+        if (count > maxOperations)
         {
-            throw new FormatError($"it has {count} operations; the limit is {limits.MaxOperationsPerPack}", ManifestSkipReason.OverLimit);
+            throw new FormatError(overLimitMessage(count), ManifestSkipReason.OverLimit);
         }
 
-        var operations = new List<IIconOperation>();
+        var operations = new List<IPatchOperation>();
         int number = 0;
         foreach (JsonElement operation in operationsElement.EnumerateArray())
         {
@@ -323,7 +401,7 @@ public static partial class ManifestParser
             }
         }
 
-        return new Pack(id, name, isDefault, operations, description);
+        return operations;
     }
 
     /// <summary>
@@ -349,7 +427,7 @@ public static partial class ManifestParser
         return text;
     }
 
-    private static IIconOperation ReadOperation(JsonElement element)
+    private static IPatchOperation ReadOperation(JsonElement element)
     {
         RequireObject(element, "an operation");
         string kind = GetRequiredString(element, "op", 32);
@@ -365,8 +443,20 @@ public static partial class ManifestParser
             case OperationKinds.Overlay:
                 fields = OverlayFields;
                 break;
+            case EffectKinds.EffectSwap:
+                fields = EffectSwapFields;
+                break;
+            case EffectKinds.GoldClickArrow:
+                fields = GoldClickArrowFields;
+                break;
+            case EffectKinds.TargetIcon:
+                fields = TargetIconFields;
+                break;
             default:
-                throw new FormatError($"unknown op '{Shorten(kind)}' (this launcher knows {string.Join(", ", OperationKinds.All)})", ManifestSkipReason.UnknownOperation);
+            {
+                string known = string.Join(", ", OperationKinds.All.Concat(EffectKinds.All));
+                throw new FormatError($"unknown op '{Shorten(kind)}' (this launcher knows {known})", ManifestSkipReason.UnknownOperation);
+            }
         }
 
         foreach (JsonProperty property in element.EnumerateObject())
@@ -384,6 +474,16 @@ public static partial class ManifestParser
         }
 
         file = ClientFiles.GetCanonicalName(file);
+        if (kind is EffectKinds.EffectSwap or EffectKinds.GoldClickArrow or EffectKinds.TargetIcon)
+        {
+            return ReadEffectOperation(element, kind, file);
+        }
+
+        if (!ClientFiles.IsIconPackage(file))
+        {
+            throw new FormatError($"a {kind} operation changes icons in {ClientFiles.IconUtx}, not in {file}");
+        }
+
         string target = ReadTextureName(element, "target");
         switch (kind)
         {
@@ -427,6 +527,75 @@ public static partial class ManifestParser
                 return new OverlayOperation(file, target, image, sha256, corner);
             }
         }
+    }
+
+    /// <summary>Effect operations name the one file they change; any other file is an error.</summary>
+    private static IEffectOperation ReadEffectOperation(JsonElement element, string kind, string file)
+    {
+        IEffectOperation operation;
+        switch (kind)
+        {
+            case EffectKinds.EffectSwap:
+            {
+                JsonElement skills = GetRequiredProperty(element, "skills");
+                if (skills.ValueKind != JsonValueKind.Array || skills.GetArrayLength() != 2)
+                {
+                    throw new FormatError("skills must be an array of two skill ids");
+                }
+
+                int first = ReadSkillId(skills[0], "skills");
+                int second = ReadSkillId(skills[1], "skills");
+                if (first == second)
+                {
+                    throw new FormatError("skills must name two different skills");
+                }
+
+                operation = new EffectSwapOperation(first, second);
+                break;
+            }
+
+            case EffectKinds.GoldClickArrow:
+            {
+                operation = new GoldClickArrowOperation();
+                break;
+            }
+
+            default:
+            {
+                int skill = ReadSkillId(GetRequiredProperty(element, "skill"), "skill");
+                int effectClass = skill;
+                if (element.TryGetProperty("effectClass", out JsonElement effectClassElement))
+                {
+                    effectClass = ReadSkillId(effectClassElement, "effectClass");
+                }
+
+                int seconds = GetOptionalInt(element, "seconds", EffectKinds.DefaultIconSeconds);
+                if (seconds < EffectKinds.MinIconSeconds || seconds > EffectKinds.MaxIconSeconds)
+                {
+                    throw new FormatError($"seconds {seconds} must be between {EffectKinds.MinIconSeconds} and {EffectKinds.MaxIconSeconds}");
+                }
+
+                operation = new TargetIconOperation(skill, effectClass, seconds);
+                break;
+            }
+        }
+
+        if (!string.Equals(operation.File, file, StringComparison.Ordinal))
+        {
+            throw new FormatError($"a {kind} operation changes {operation.File}, not {file}");
+        }
+
+        return operation;
+    }
+
+    private static int ReadSkillId(JsonElement value, string name)
+    {
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int id) || !EffectKinds.IsValidSkillId(id))
+        {
+            throw new FormatError($"{name} must hold skill ids from 1 to {EffectKinds.MaxSkillId}");
+        }
+
+        return id;
     }
 
     private static IReadOnlyList<OptionPreset> ReadPresets(JsonElement root, ManifestLimits limits, List<ManifestNote> notes)

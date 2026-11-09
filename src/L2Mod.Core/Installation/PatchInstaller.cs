@@ -1,4 +1,5 @@
 using System.Text;
+using L2Mod.Core.Effects;
 using L2Mod.Core.Manifests;
 using L2Mod.Core.Operations;
 using L2Mod.Core.Packages;
@@ -96,6 +97,9 @@ public sealed record PatchFileStatus(
     string Message)
 {
     public PatchReason Reason { get; init; }
+
+    /// <summary>How many operations of the selection change this file (0 when switched off or unreadable).</summary>
+    public int OperationCount { get; init; }
 }
 
 public enum PatchOutcome
@@ -130,8 +134,12 @@ public sealed record PatchFileResult(string FileName, PatchOutcome Outcome, stri
 /// </summary>
 public sealed class PatchInstaller
 {
-    /// <summary>Part of the recipe key; bump it when encoding changes, so installed patches get rebuilt.</summary>
+    /// <summary>Part of Icon.utx's recipe key; bump it when encoding changes, so installed patches get rebuilt.</summary>
     public const int EngineVersion = 1;
+
+    /// <summary>Part of the recipe key of the effect packages (system_season); bump it when the effect engine changes
+    /// its output, so installed patches get rebuilt.</summary>
+    public const int EffectEngineVersion = 1;
 
     private readonly InstallerOptions _options;
     private readonly IFileSystem _fileSystem;
@@ -146,12 +154,23 @@ public sealed class PatchInstaller
         _store = new InstallStateStore(fileSystem, options.StatePath, options.ClientDirectory);
     }
 
-    /// <summary>Identifies a set of operations (order matters) together with the engine version.</summary>
-    public static string ComputeRecipeKey(IReadOnlyList<IIconOperation> operations)
+    /// <summary>
+    /// Identifies the operations of one file (order matters) together with the version of the engine that builds
+    /// it. Icon.utx keeps the key of launchers before the effect packages, so its installed patches stay up to date.
+    /// </summary>
+    public static string ComputeRecipeKey(string fileName, IReadOnlyList<IPatchOperation> operations)
     {
         var text = new StringBuilder();
-        text.Append("engine ").Append(EngineVersion).Append('\n');
-        foreach (IIconOperation operation in operations)
+        if (ClientFiles.IsIconPackage(fileName))
+        {
+            text.Append("engine ").Append(EngineVersion).Append('\n');
+        }
+        else
+        {
+            text.Append("effect engine ").Append(EffectEngineVersion).Append(' ').Append(fileName).Append('\n');
+        }
+
+        foreach (IPatchOperation operation in operations)
         {
             text.Append(operation.Describe()).Append('\n');
         }
@@ -186,7 +205,7 @@ public sealed class PatchInstaller
             {
                 InstallState state = _store.Load();
                 Inspection inspection = Inspect(fileName, manifest, selectedPackIds, state);
-                results.Add(Execute(inspection, state, assets));
+                results.Add(Execute(inspection, state, assets, manifest));
             }
             catch (Exception exception) when (IsExpectedFailure(exception))
             {
@@ -271,20 +290,21 @@ public sealed class PatchInstaller
             var missing = new PatchFileStatus(fileName, PatchFileState.Missing, null, hasBackup, PendingAction.None, $"{ClientFiles.GetRelativePath(fileName)} was not found in the client folder.")
             {
                 Reason = PatchReason.FileMissing,
+                OperationCount = CountOperations(fileName, manifest, selectedPackIds),
             };
-            return new Inspection(missing, null, Array.Empty<IIconOperation>(), string.Empty, installed);
+            return new Inspection(missing, null, Array.Empty<IPatchOperation>(), string.Empty, installed);
         }
 
         byte[] current = _fileSystem.ReadAllBytes(path);
         string hash = ContentHash.Sha256Hex(current);
         bool readable = manifest.Schema == ManifestParser.SupportedSchema;
-        IReadOnlyList<IIconOperation> operations = Array.Empty<IIconOperation>();
+        IReadOnlyList<IPatchOperation> operations = Array.Empty<IPatchOperation>();
         if (manifest.Enabled && readable)
         {
             operations = manifest.GetOperations(fileName, selectedPackIds);
         }
 
-        string recipeKey = ComputeRecipeKey(operations);
+        string recipeKey = ComputeRecipeKey(fileName, operations);
         PatchFileState fileState;
         Plan plan;
         if (manifest.IsSupportedOriginal(fileName, hash))
@@ -324,15 +344,26 @@ public sealed class PatchInstaller
         var status = new PatchFileStatus(fileName, fileState, hash, hasBackup, plan.Pending, plan.Message)
         {
             Reason = plan.Reason,
+            OperationCount = operations.Count,
         };
         return new Inspection(status, current, operations, recipeKey, installed);
+    }
+
+    private static int CountOperations(string fileName, Manifest manifest, IReadOnlyCollection<string> selectedPackIds)
+    {
+        if (!manifest.Enabled || manifest.Schema != ManifestParser.SupportedSchema)
+        {
+            return 0;
+        }
+
+        return manifest.GetOperations(fileName, selectedPackIds).Count;
     }
 
     private static Plan PlanForOurPatch(
         string fileName,
         Manifest manifest,
         bool readable,
-        IReadOnlyList<IIconOperation> operations,
+        IReadOnlyList<IPatchOperation> operations,
         string recipeKey,
         InstalledFile installed)
     {
@@ -364,7 +395,7 @@ public sealed class PatchInstaller
         return new Plan(PendingAction.Rebuild, PatchReason.Outdated, $"Recipes or selected packs changed; {fileName} will be rebuilt from the original.");
     }
 
-    private PatchFileResult Execute(Inspection inspection, InstallState state, IAssetStore assets)
+    private PatchFileResult Execute(Inspection inspection, InstallState state, IAssetStore assets, Manifest manifest)
     {
         PatchFileStatus status = inspection.Status;
         string fileName = status.FileName;
@@ -375,7 +406,7 @@ public sealed class PatchInstaller
                 byte[] original = inspection.Current!;
                 string originalHash = status.CurrentSha256!;
                 EnsureBackup(fileName, original, originalHash);
-                (byte[] patched, IReadOnlyList<string> warnings) = BuildPatch(fileName, original, inspection.Operations, assets);
+                (byte[] patched, IReadOnlyList<string> warnings) = BuildPatch(fileName, original, inspection.Operations, assets, manifest);
                 Install(fileName, patched, originalHash, inspection.RecipeKey, state);
                 return Result(fileName, PatchOutcome.Installed, status.Reason, $"Patch of {fileName} installed ({inspection.Operations.Count} operations).", warnings);
             }
@@ -384,7 +415,7 @@ public sealed class PatchInstaller
             {
                 string originalHash = inspection.Installed!.OriginalSha256;
                 byte[] original = ReadBackup(fileName, originalHash);
-                (byte[] patched, IReadOnlyList<string> warnings) = BuildPatch(fileName, original, inspection.Operations, assets);
+                (byte[] patched, IReadOnlyList<string> warnings) = BuildPatch(fileName, original, inspection.Operations, assets, manifest);
                 if (ContentHash.Matches(status.CurrentSha256!, patched))
                 {
                     state.Files[fileName] = inspection.Installed with { RecipeKey = inspection.RecipeKey };
@@ -434,11 +465,57 @@ public sealed class PatchInstaller
         return Result(fileName, PatchOutcome.Restored, PatchReason.RestoreRequested, $"Original {fileName} restored.", Array.Empty<string>());
     }
 
-    private (byte[] Bytes, IReadOnlyList<string> Warnings) BuildPatch(string fileName, byte[] original, IReadOnlyList<IIconOperation> operations, IAssetStore assets)
+    /// <summary>
+    /// Icon.utx: the icon operations drawn on the original. The effect packages: <see cref="EffectComposer"/>, with
+    /// the icons over the target read from the original Icon.utx (<see cref="ReadOriginal"/>).
+    /// </summary>
+    private (byte[] Bytes, IReadOnlyList<string> Warnings) BuildPatch(
+        string fileName,
+        byte[] original,
+        IReadOnlyList<IPatchOperation> operations,
+        IAssetStore assets,
+        Manifest manifest)
     {
-        var package = new IconPackage(Path.GetFileNameWithoutExtension(fileName), L2File.FromBytes(original));
-        OperationBuildResult build = OperationComposer.Build(package, operations, assets);
-        return (build.Replacement.FileBytes, build.Warnings);
+        if (ClientFiles.IsIconPackage(fileName))
+        {
+            var package = new IconPackage(Path.GetFileNameWithoutExtension(fileName), L2File.FromBytes(original));
+            var iconOperations = new List<IIconOperation>();
+            foreach (IPatchOperation operation in operations)
+            {
+                if (operation is not IIconOperation icon)
+                {
+                    throw new InvalidDataException($"'{operation.Describe()}' cannot be applied to {fileName}.");
+                }
+
+                iconOperations.Add(icon);
+            }
+
+            OperationBuildResult build = OperationComposer.Build(package, iconOperations, assets);
+            return (build.Replacement.FileBytes, build.Warnings);
+        }
+
+        var effectOperations = new List<IEffectOperation>();
+        foreach (IPatchOperation operation in operations)
+        {
+            if (operation is not IEffectOperation effect)
+            {
+                throw new InvalidDataException($"'{operation.Describe()}' cannot be applied to {fileName}.");
+            }
+
+            effectOperations.Add(effect);
+        }
+
+        EffectBuildResult effects = EffectComposer.Build(fileName, original, effectOperations, () =>
+        {
+            byte[]? icons = ReadOriginal(manifest, ClientFiles.IconUtx);
+            if (icons is null)
+            {
+                return null;
+            }
+
+            return new IconPackage(Path.GetFileNameWithoutExtension(ClientFiles.IconUtx), L2File.FromBytes(icons));
+        });
+        return (effects.FileBytes, Array.Empty<string>());
     }
 
     private void Install(string fileName, byte[] patched, string originalHash, string recipeKey, InstallState state)
@@ -519,7 +596,7 @@ public sealed class PatchInstaller
     private sealed record Inspection(
         PatchFileStatus Status,
         byte[]? Current,
-        IReadOnlyList<IIconOperation> Operations,
+        IReadOnlyList<IPatchOperation> Operations,
         string RecipeKey,
         InstalledFile? Installed);
 }

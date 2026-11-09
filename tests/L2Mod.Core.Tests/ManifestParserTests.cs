@@ -487,7 +487,7 @@ public class ManifestParserTests
     {
         Manifest manifest = Parse(Example()).Manifest;
 
-        IReadOnlyList<IIconOperation> operations = manifest.GetOperations("Icon.utx", new[] { "item-marks", "dance-song-badges", "missing" });
+        IReadOnlyList<IPatchOperation> operations = manifest.GetOperations("Icon.utx", new[] { "item-marks", "dance-song-badges", "missing" });
 
         Assert.Equal(new[] { "badge", "overlay" }, operations.Select(operation => operation.Kind));
     }

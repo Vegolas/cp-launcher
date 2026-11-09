@@ -2,18 +2,25 @@ using L2Mod.Core.Imaging;
 
 namespace L2Mod.Core.Operations;
 
-/// <summary>
-/// One size-preserving change of one texture in one client file. Operations on the same texture are drawn
-/// in order onto one RGBA image, which is then encoded once.
-/// </summary>
-public interface IIconOperation
+/// <summary>One change of one whitelisted client file, as listed in a manifest pack.</summary>
+public interface IPatchOperation
 {
-    /// <summary>The manifest "op" value (see <see cref="OperationKinds"/>).</summary>
+    /// <summary>The manifest "op" value (see <see cref="OperationKinds"/> and <c>EffectKinds</c>).</summary>
     string Kind { get; }
 
     /// <summary>Client file name, e.g. "Icon.utx".</summary>
     string File { get; }
 
+    /// <summary>Stable one-line description (logs, warnings and the recipe key of an installed patch).</summary>
+    string Describe();
+}
+
+/// <summary>
+/// One size-preserving change of one texture in one client file. Operations on the same texture are drawn
+/// in order onto one RGBA image, which is then encoded once.
+/// </summary>
+public interface IIconOperation : IPatchOperation
+{
     /// <summary>Texture name as accepted by <see cref="IconPackage.FindTexture"/>.</summary>
     string Target { get; }
 
@@ -24,9 +31,6 @@ public interface IIconOperation
     /// re-encoded, or null when nothing changed.
     /// </summary>
     PixelRect? Apply(RgbaImage icon, IOperationSources sources);
-
-    /// <summary>Stable one-line description (logs, warnings and the recipe key of an installed patch).</summary>
-    string Describe();
 }
 
 /// <summary>Inputs an operation may need besides the icon it draws on.</summary>

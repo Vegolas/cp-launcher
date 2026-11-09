@@ -12,8 +12,9 @@ using L2Mod.Core.Updates;
 namespace CpLauncher.ViewModels;
 
 /// <summary>
-/// The main screen: manifest and Icon.utx status, packs with previews, Apply / Restore original, Option.ini
-/// presets, announcements, "Uruchom L2Dex" and the launcher update. All file changes go through Core's
+/// The main screen: manifest and the status of the client files (Icon.utx and, when the selection touches them, the
+/// effect packages), packs with previews and options, Apply / Restore original, Option.ini presets, announcements,
+/// "Uruchom L2Dex" and the launcher update. All file changes go through Core's
 /// <see cref="PatchInstaller"/> and <see cref="OptionPresetInstaller"/>, which also enforce the game-running
 /// guard; the launcher update goes through Core's <see cref="UpdateService"/>.
 /// </summary>
@@ -34,6 +35,7 @@ public partial class DashboardViewModel : ObservableObject
     private LoadedManifest? _manifest;
     private IManifestSource? _source;
     private PatchFileStatus? _iconStatus;
+    private IReadOnlyList<PatchFileStatus> _fileStatuses = Array.Empty<PatchFileStatus>();
     private int _statusGeneration;
     private PendingUpdate? _pendingUpdate;
     private bool _shuttingDown;
@@ -67,7 +69,7 @@ public partial class DashboardViewModel : ObservableObject
         _selectedGameExecutable = GameExecutableOptions.First(option => option.RelativePath == services.Settings.Current.GameExecutable);
     }
 
-    /// <summary>Raised after "Zastosuj" installed or rebuilt the changes in Icon.utx (the view animates the packs).</summary>
+    /// <summary>Raised after "Zastosuj" installed or rebuilt changes in a client file (the view animates the packs).</summary>
     public event EventHandler? ChangesInstalled;
 
     public string ClientDirectory
@@ -122,21 +124,30 @@ public partial class DashboardViewModel : ObservableObject
         }
     }
 
-    /// <summary>"Zastosuj" would change Icon.utx (install, rebuild or restore); false when the changes are up to date.</summary>
+    /// <summary>The status of every whitelisted client file (empty while it cannot be read).</summary>
+    public IReadOnlyList<PatchFileStatus> FileStatuses
+    {
+        get
+        {
+            return _fileStatuses;
+        }
+    }
+
+    /// <summary>"Zastosuj" would change a client file (install, rebuild or restore); false when the changes are up to date.</summary>
     public bool HasPendingChanges
     {
         get
         {
-            return _iconStatus is not null && _iconStatus.Pending != PendingAction.None;
+            return _fileStatuses.Any(status => status.Pending != PendingAction.None);
         }
     }
 
-    /// <summary>Icon.utx is not the original and a copy of the original exists ("Przywróć oryginał" is shown).</summary>
+    /// <summary>A client file is not the original and a copy of the original exists ("Przywróć oryginał" is shown).</summary>
     public bool HasOriginalToRestore
     {
         get
         {
-            return _iconStatus is not null && _iconStatus.HasBackup && _iconStatus.State != PatchFileState.Original;
+            return _fileStatuses.Any(status => status.HasBackup && status.State != PatchFileState.Original);
         }
     }
 
@@ -291,7 +302,7 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         string text = $"Uruchomiono {relative}.";
-        if (_iconStatus?.Pending is PendingAction.Install or PendingAction.Rebuild)
+        if (_fileStatuses.Any(status => status.Pending is PendingAction.Install or PendingAction.Rebuild))
         {
             text += " Uwaga: wybrane zmiany nie zostały zastosowane.";
         }
@@ -381,7 +392,7 @@ public partial class DashboardViewModel : ObservableObject
 
     private bool CanApply()
     {
-        return !IsBusy && _manifest is not null && PacksEditable && _iconStatus is not null && _iconStatus.Pending != PendingAction.None;
+        return !IsBusy && _manifest is not null && PacksEditable && HasPendingChanges;
     }
 
     private bool CanRestoreOriginal()
@@ -483,7 +494,7 @@ public partial class DashboardViewModel : ObservableObject
         await RefreshStatusAsync();
         await RenderPreviewsAsync();
         RefreshPresetState();
-        if (_manifest is not null && !_manifest.Manifest.Enabled && _iconStatus?.Pending == PendingAction.Restore)
+        if (_manifest is not null && !_manifest.Manifest.Enabled && _fileStatuses.Any(status => status.Pending == PendingAction.Restore))
         {
             await ApplyCoreAsync(true);
         }
@@ -530,7 +541,7 @@ public partial class DashboardViewModel : ObservableObject
 
         if (!manifest.Enabled)
         {
-            Banners.Add(new NoticeViewModel(StatusSeverity.Warning, "Lider CP wyłączył zmiany (wyłącznik awaryjny). Launcher przywraca oryginalny Icon.utx."));
+            Banners.Add(new NoticeViewModel(StatusSeverity.Warning, "Lider CP wyłączył zmiany (wyłącznik awaryjny). Launcher przywraca oryginalne pliki."));
         }
 
         foreach (ManifestNote note in loaded.Notes)
@@ -555,7 +566,8 @@ public partial class DashboardViewModel : ObservableObject
         LauncherSettings settings = _services.Settings.Current;
         foreach (Pack pack in manifest.Packs)
         {
-            Packs.Add(new PackViewModel(pack, settings.IsSelected(pack), OnPackSelectionChanged));
+            List<bool> options = pack.Options.Select(option => settings.IsSelected(pack, option)).ToList();
+            Packs.Add(new PackViewModel(pack, settings.IsSelected(pack), options, OnPackSelectionChanged));
         }
 
         UpdatePackEditability();
@@ -729,16 +741,21 @@ public partial class DashboardViewModel : ObservableObject
             }
         }
 
-        int operationCount = manifest.GetOperations(ClientFiles.IconUtx, selected).Count;
+        IReadOnlyList<PatchFileStatus> before = _fileStatuses;
         IReadOnlyList<PatchFileResult> results = await Task.Run(() =>
         {
             return _installer.Apply(manifest, selected, _services.Assets.Store);
         });
-        PatchFileResult result = results.Single(item => item.FileName == ClientFiles.IconUtx);
-        StatusText described = StatusTexts.DescribeApply(result, operationCount);
+        StatusText described = StatusTexts.DescribeApply(results, WithOperationCounts(before, manifest, selected));
         LastAction = new NoticeViewModel(described.Severity, described.Text);
-        AddDetails(result);
-        if (!automatic && result.Outcome is PatchOutcome.Installed or PatchOutcome.Rebuilt or PatchOutcome.Restored or PatchOutcome.Unchanged)
+        foreach (PatchFileResult result in results)
+        {
+            AddDetails(result);
+        }
+
+        bool blocked = results.Any(result => result.Outcome == PatchOutcome.Blocked);
+        bool anyDone = results.Any(result => result.Outcome is PatchOutcome.Installed or PatchOutcome.Rebuilt or PatchOutcome.Restored or PatchOutcome.Unchanged);
+        if (!automatic && !blocked && anyDone)
         {
             try
             {
@@ -752,33 +769,65 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         await RefreshStatusAsync();
-        if (result.Outcome is PatchOutcome.Installed or PatchOutcome.Rebuilt)
+        if (results.Any(result => result.Outcome is PatchOutcome.Installed or PatchOutcome.Rebuilt))
         {
             ChangesInstalled?.Invoke(this, EventArgs.Empty);
         }
     }
 
+    /// <summary>The statuses before "Zastosuj" with the operation counts of the selection that was applied (the
+    /// status may be from before the last click of a checkbox).</summary>
+    private static IReadOnlyList<PatchFileStatus> WithOperationCounts(IReadOnlyList<PatchFileStatus> before, Manifest manifest, IReadOnlyList<string> selected)
+    {
+        var statuses = new List<PatchFileStatus>();
+        foreach (PatchFileStatus status in before)
+        {
+            int count = 0;
+            if (manifest.Enabled)
+            {
+                count = manifest.GetOperations(status.FileName, selected).Count;
+            }
+
+            statuses.Add(status with { OperationCount = count });
+        }
+
+        if (!statuses.Any(status => status.FileName == ClientFiles.IconUtx))
+        {
+            int count = manifest.GetOperations(ClientFiles.IconUtx, selected).Count;
+            statuses.Add(new PatchFileStatus(ClientFiles.IconUtx, PatchFileState.Missing, null, false, PendingAction.None, string.Empty)
+            {
+                OperationCount = count,
+            });
+        }
+
+        return statuses;
+    }
+
     private async Task RestoreCoreAsync()
     {
-        if (_iconStatus?.State == PatchFileState.Unknown)
+        PatchFileStatus? unknown = _fileStatuses.FirstOrDefault(status => status.State == PatchFileState.Unknown && status.HasBackup);
+        if (unknown is not null)
         {
             bool confirmed = await _services.Dialogs.ConfirmAsync(
                 "Przywrócić oryginał?",
-                "Icon.utx w kliencie to wersja, której launcher nie zna – możliwe, że L2Dex właśnie go zaktualizował. "
+                $"{unknown.FileName} w kliencie to wersja, której launcher nie zna – możliwe, że L2Dex właśnie go zaktualizował. "
                 + "Przywrócenie zapisanej kopii może zastąpić nowszy plik od L2Dex starszą wersją.\n\nPrzywrócić mimo to?",
                 "Przywróć");
             if (!confirmed)
             {
-                LastAction = new NoticeViewModel(StatusSeverity.Info, "Anulowano – Icon.utx bez zmian.");
+                LastAction = new NoticeViewModel(StatusSeverity.Info, "Anulowano – pliki bez zmian.");
                 return;
             }
         }
 
         IReadOnlyList<PatchFileResult> results = await Task.Run(_installer.Restore);
-        PatchFileResult result = results.Single(item => item.FileName == ClientFiles.IconUtx);
-        StatusText described = StatusTexts.DescribeRestore(result);
+        StatusText described = StatusTexts.DescribeRestore(results);
         LastAction = new NoticeViewModel(described.Severity, described.Text);
-        AddDetails(result);
+        foreach (PatchFileResult result in results)
+        {
+            AddDetails(result);
+        }
+
         await RefreshStatusAsync();
     }
 
@@ -796,29 +845,31 @@ public partial class DashboardViewModel : ObservableObject
             return;
         }
 
-        _iconStatus = snapshot.Status;
-        if (snapshot.Status is null)
+        _fileStatuses = snapshot.Statuses;
+        _iconStatus = snapshot.Statuses.FirstOrDefault(status => status.FileName == ClientFiles.IconUtx);
+        if (_iconStatus is null)
         {
             IconState = new NoticeViewModel(StatusSeverity.Error, $"Nie można sprawdzić Icon.utx: {snapshot.Error}");
             PendingText = null;
         }
-        else if (_manifest is null && snapshot.Status.State == PatchFileState.Unknown)
+        else if (_manifest is null && _iconStatus.State == PatchFileState.Unknown)
         {
             IconState = new NoticeViewModel(StatusSeverity.Info, "Bez przepisów nie da się sprawdzić wersji Icon.utx.");
             PendingText = null;
         }
         else
         {
-            StatusText state = StatusTexts.DescribeState(snapshot.Status);
+            StatusText state = StatusTexts.DescribeState(_fileStatuses);
             IconState = new NoticeViewModel(state.Severity, state.Text);
             PendingText = null;
             if (_manifest is not null)
             {
-                PendingText = StatusTexts.DescribePending(snapshot.Status);
+                PendingText = StatusTexts.DescribePending(_fileStatuses);
             }
         }
 
         OnPropertyChanged(nameof(IconStatus));
+        OnPropertyChanged(nameof(FileStatuses));
         OnPropertyChanged(nameof(HasOriginalToRestore));
         OnPropertyChanged(nameof(HasPendingChanges));
         ApplyCommand.NotifyCanExecuteChanged();
@@ -829,12 +880,11 @@ public partial class DashboardViewModel : ObservableObject
     {
         try
         {
-            PatchFileStatus status = _installer.GetStatus(manifest, selected).Single(item => item.FileName == ClientFiles.IconUtx);
-            return new StatusSnapshot(status, null);
+            return new StatusSnapshot(_installer.GetStatus(manifest, selected), null);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
         {
-            return new StatusSnapshot(null, exception.Message);
+            return new StatusSnapshot(Array.Empty<PatchFileStatus>(), exception.Message);
         }
     }
 
@@ -846,8 +896,7 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         Manifest manifest = _manifest.Manifest;
-        List<string> allPacks = manifest.Packs.Select(pack => pack.Id).ToList();
-        AssetSyncResult assets = await _services.Assets.EnsureAsync(AssetCache.GetOverlays(manifest, allPacks), _source, CancellationToken.None);
+        AssetSyncResult assets = await _services.Assets.EnsureAsync(AssetCache.GetOverlays(manifest, manifest.GetAllSelectionIds()), _source, CancellationToken.None);
         foreach (string error in assets.Errors)
         {
             Details.Add(error);
@@ -1017,9 +1066,10 @@ public partial class DashboardViewModel : ObservableObject
         }
     }
 
+    /// <summary>The ids of the selected packs and options (see <see cref="Manifest.GetOperations"/>).</summary>
     private IReadOnlyList<string> SelectedPackIds()
     {
-        return Packs.Where(pack => pack.IsSelected).Select(pack => pack.Id).ToList();
+        return Packs.SelectMany(pack => pack.SelectedIds).ToList();
     }
 
     private static IReadOnlyList<GameExecutableOption> BuildGameExecutableOptions(string configured)
@@ -1050,7 +1100,7 @@ public partial class DashboardViewModel : ObservableObject
         }
     }
 
-    private sealed record StatusSnapshot(PatchFileStatus? Status, string? Error);
+    private sealed record StatusSnapshot(IReadOnlyList<PatchFileStatus> Statuses, string? Error);
 
     /// <summary>An update the member can install now: the updater for the manifest's source and its check.</summary>
     private sealed record PendingUpdate(UpdateService Service, UpdateCheckResult Check);

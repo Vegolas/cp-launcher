@@ -1,4 +1,5 @@
 using System.Text;
+using L2Mod.Core;
 using L2Mod.Core.Imaging;
 using L2Mod.Core.Manifests;
 using L2Mod.Core.Publishing;
@@ -75,7 +76,8 @@ public sealed class LeaderCommands
     {
         output.WriteLine("  keygen  [--private <path>] [--public <path>]");
         output.WriteLine("          default private key %USERPROFILE%\\.l2mod\\signing-private.pem (never overwritten), public key keys/signing-public.pem");
-        output.WriteLine("  build   <recipes-dir> <original Icon.utx> <out-dir> [--version V] [--previews <dir>] [--preview-scale 4] [--overwrite]");
+        output.WriteLine("  build   <recipes-dir> <original Icon.utx | dir with the originals> <out-dir> [--version V] [--previews <dir>] [--preview-scale 4] [--overwrite]");
+        output.WriteLine("          effect packs also need the original LineageSkillEffect.u / LineageEffect.u: pass a folder holding all originals");
         output.WriteLine("          default previews work/preview/packs (they show NCSoft icons: never inside out-dir, never published)");
         output.WriteLine("  sign    <dist-dir> [--key <private.pem>] [--public <public.pem>]");
         output.WriteLine("  verify  <dist-dir> [--public <public.pem>]");
@@ -166,6 +168,15 @@ public sealed class LeaderCommands
         }
 
         string originalPath = Path.GetFullPath(command.Positional[1]);
+        IReadOnlyList<string> originalPaths = new[] { originalPath };
+        if (Directory.Exists(originalPath))
+        {
+            originalPaths = ClientFiles.Patchable
+                .Select(file => Path.Combine(originalPath, file))
+                .Where(File.Exists)
+                .ToList();
+        }
+
         string outputPath = Path.GetFullPath(command.Positional[2]);
         string previewPath = Path.GetFullPath(command.GetOption("previews") ?? _defaults.PreviewDirectory);
         if (IsSameOrInside(previewPath, outputPath))
@@ -189,16 +200,38 @@ public sealed class LeaderCommands
             Version = command.GetOption("version"),
             PreviewScale = command.GetInt("preview-scale", DefaultPreviewScale, 1, 16),
         };
-        DistBuildResult build = DistBuilder.Build(project, originalPath, options);
+        DistBuildResult build = DistBuilder.Build(project, originalPaths, options);
         DistWriteResult written = DistWriter.Write(outputPath, build, command.HasFlag("overwrite"));
         WritePreviews(previewPath, build.Previews);
 
-        _output.WriteLine($"Version {build.Manifest.Version}, enabled {build.Manifest.Enabled.ToString().ToLowerInvariant()}, original Icon.utx {build.OriginalSha256}.");
+        _output.WriteLine($"Version {build.Manifest.Version}, enabled {build.Manifest.Enabled.ToString().ToLowerInvariant()}.");
+        foreach (KeyValuePair<string, string> original in build.Originals)
+        {
+            _output.WriteLine($"  original {original.Key} {original.Value}");
+        }
+
         foreach (CompiledPack pack in build.Packs)
         {
-            string type = pack.Recipe.Type.ToString().ToLowerInvariant();
+            string type = RecipePack.GetTypeName(pack.Recipe.Type);
             string selection = pack.Recipe.Default ? "on by default" : "off by default";
-            _output.WriteLine($"  {pack.Recipe.Id,-20} {type,-7} {pack.Entries.Count,4} operation(s), {selection}; preview {Path.Combine(previewPath, pack.Recipe.Id + ".png")}");
+            string optionCount = string.Empty;
+            if (pack.Options.Count > 0)
+            {
+                optionCount = $" in {pack.Options.Count} option(s)";
+            }
+
+            string preview = "no preview";
+            if (build.Previews.Any(item => item.PackId == pack.Recipe.Id))
+            {
+                preview = "preview " + Path.Combine(previewPath, pack.Recipe.Id + ".png");
+            }
+
+            _output.WriteLine($"  {pack.Recipe.Id,-20} {type,-16} {pack.Entries.Count,4} operation(s){optionCount}, {selection}; {preview}");
+        }
+
+        foreach (string note in build.Notes)
+        {
+            _output.WriteLine($"  {note}");
         }
 
         if (build.Manifest.Announcements.Count > 0 || build.Manifest.OptionPresets.Count > 0)
@@ -597,7 +630,7 @@ public sealed class LeaderCommands
             PngCodec.Save(preview.Sheet, Path.Combine(directory, preview.PackId + ".png"));
             var lines = new List<string>
             {
-                $"# {preview.PackId}: before | after (after decoded from the encoded file), numbered left to right, top to bottom.",
+                $"# {preview.PackId}: {preview.Caption}, numbered left to right, top to bottom.",
             };
             lines.AddRange(preview.Index);
             File.WriteAllLines(Path.Combine(directory, preview.PackId + ".txt"), lines);

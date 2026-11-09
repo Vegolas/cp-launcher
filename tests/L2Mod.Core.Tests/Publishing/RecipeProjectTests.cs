@@ -66,7 +66,7 @@ public class RecipeProjectTests
     }
 
     [Theory]
-    [InlineData("\"type\": \"sticker\"", "is not badge, tag or overlay")]
+    [InlineData("\"type\": \"sticker\"", "is not one of badge, tag, overlay, effect-swap, gold-click-arrow, target-icon")]
     [InlineData("\"type\": \"overlay\", \"size\": 8", "an overlay has the size of its PNG")]
     [InlineData("\"type\": \"badge\", \"colors\": { \"CC\": \"#E02020\" }", "only tag packs have category colours")]
     [InlineData("\"type\": \"tag\", \"colors\": { \"CC\": \"E02020\" }", "must be a #RRGGBB string")]
@@ -180,7 +180,8 @@ public class RecipeProjectTests
         RecipeProject project = RecipeProject.Load(Path.Combine(root, "recipes"));
         CompiledRecipes compiled = RecipeCompiler.Compile(project);
 
-        Assert.Equal(new[] { "dance-song-badges", "chant-badges", "debuff-tags", "mob-debuff-tags" }, project.Packs.Select(pack => pack.Id));
+        string[] ids = { "dance-song-badges", "chant-badges", "debuff-tags", "mob-debuff-tags", "target-icons", "skill-effect-swaps", "gold-click-arrow" };
+        Assert.Equal(ids, project.Packs.Select(pack => pack.Id));
         string mappings = Path.Combine(root, "mappings");
         Assert.Equal(
             new[]
@@ -189,16 +190,31 @@ public class RecipeProjectTests
                 Path.Combine(mappings, "chants.txt"),
                 Path.Combine(mappings, "debuff-tags.txt"),
                 Path.Combine(mappings, "mob-debuff-tags.txt"),
+                Path.Combine(mappings, "debuff-icons.txt"),
+                Path.Combine(mappings, "effect-swaps.txt"),
+                string.Empty,
             },
             project.Packs.Select(pack => pack.MappingPath));
-        Assert.Equal(new[] { 22, 22, 90, 25 }, compiled.Packs.Select(pack => pack.Entries.Count));
+        Assert.Equal(new[] { 22, 22, 90, 25, 9, 2, 1 }, compiled.Packs.Select(pack => pack.Entries.Count));
         Assert.All(compiled.Packs[0].Operations.Concat(compiled.Packs[1].Operations), operation => Assert.Equal(20, Assert.IsType<BadgeOperation>(operation).Style.Size));
+
+        // The effect packs are opt-in, one option per status or swap.
+        Assert.All(project.Packs.Skip(4), pack => Assert.False(pack.Default));
+        Assert.Equal(new[] { "1071", "1074", "1083", "1223", "1056", "1323", "1016", "1398", "1399" }, compiled.Packs[4].Options.Select(option => option.Id));
+        Assert.Equal(new[] { "1235-1175", "1230-1220" }, compiled.Packs[5].Options.Select(option => option.Id));
+        Assert.Empty(compiled.Packs[6].Options);
+        var originals = new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["Icon.utx"] = new[] { ManifestParserTests.OriginalHash },
+            ["LineageSkillEffect.u"] = new[] { ManifestParserTests.OriginalHash },
+            ["LineageEffect.u"] = new[] { ManifestParserTests.OriginalHash },
+        };
         var manifest = new Manifest(
             1,
             project.Version,
             project.Enabled,
             null,
-            new Dictionary<string, IReadOnlyList<string>> { ["Icon.utx"] = new[] { ManifestParserTests.OriginalHash } },
+            originals,
             project.Announcements,
             compiled.Packs.Select(pack => pack.ToManifestPack()).ToList(),
             project.OptionPresets);

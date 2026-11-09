@@ -579,6 +579,17 @@
     <Style Selector="Border.pack.off StackPanel.strip">
       <Setter Property="Opacity" Value="0.4" />
     </Style>
+    <!-- An option of a pack (one status, one effect swap): its icons dim like a pack's strip while it is off -->
+    <Style Selector="Border.option ItemsControl">
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.option.off ItemsControl">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
     <Style Selector="Border.count">
       <Setter Property="Background" Value="#0B0E12" />
       <Setter Property="BorderBrush" Value="#262D37" />

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "2026.10.20.1",
+  "version": "2026.11.09.1",
   "enabled": true,
   "launcher": { "version": "1.1.0", "file": "../work/releases/1.1.0/CpLauncher.exe" },
   "packs": [
@@ -35,6 +35,29 @@
       "default": true,
       "type": "tag",
       "mapping": "../mappings/mob-debuff-tags.txt"
+    },
+    {
+      "id": "target-icons",
+      "name": "Ikony nad celem",
+      "description": "Ikona umiejętności unosi się nad głową celu, gdy umiejętność go trafi. Uwaga: to nie jest wskaźnik debuffa – ikona pojawia się przy każdym rzucie, który doleci do celu, także gdy cel się oprze (resist), i znika po 5 sekundach bez względu na to, ile trwa efekt. Zaznacz, które umiejętności mają ją pokazywać.",
+      "default": false,
+      "type": "target-icon",
+      "mapping": "../mappings/debuff-icons.txt"
+    },
+    {
+      "id": "skill-effect-swaps",
+      "name": "Zamiana efektów umiejętności",
+      "description": "Dwie umiejętności zamieniają się wyglądem w obie strony. Zmienia się tylko animacja – działanie i ikony zostają.",
+      "default": false,
+      "type": "effect-swap",
+      "mapping": "../mappings/effect-swaps.txt"
+    },
+    {
+      "id": "gold-click-arrow",
+      "name": "Złota strzałka ruchu",
+      "description": "Strzałka w miejscu kliknięcia przy chodzeniu jest złota zamiast niebieskiej.",
+      "default": false,
+      "type": "gold-click-arrow"
     }
   ],
   "announcements": [],

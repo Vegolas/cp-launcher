@@ -35,6 +35,11 @@ public static class SmokeRun
         }
 
         Add(report, "packs", string.Join(",", dashboard.Packs.Select(pack => $"{pack.Id}{(pack.IsSelected ? "*" : string.Empty)}:{pack.Thumbnails.Count}")));
+        foreach (PackViewModel pack in dashboard.Packs.Where(item => item.HasOptions))
+        {
+            Add(report, "options", $"{pack.Id} " + string.Join(",", pack.Options.Select(option => $"{option.Option.Id}{(option.IsSelected ? "*" : string.Empty)}:{option.Thumbnails.Count}")));
+        }
+
         Add(report, "presets", dashboard.Presets.Count.ToString(CultureInfo.InvariantCulture));
         Add(report, "announcements", dashboard.Announcements.Count.ToString(CultureInfo.InvariantCulture));
         Add(report, "update", dashboard.UpdateText ?? "none");
@@ -152,10 +157,15 @@ public static class SmokeRun
         Add(report, name, dashboard.LastAction?.Text ?? "no result");
     }
 
+    /// <summary>The state of Icon.utx (with the dialog's text) and of every other client file the selection concerns.</summary>
     private static void AddIcon(StringBuilder report, string name, DashboardViewModel dashboard)
     {
         string hash = dashboard.IconStatus?.CurrentSha256 ?? "none";
         Add(report, name, $"{dashboard.IconStatus?.State} sha256={hash} pending={dashboard.IconStatus?.Pending} | {dashboard.IconState.Text}");
+        foreach (L2Mod.Core.Installation.PatchFileStatus status in dashboard.FileStatuses.Skip(1).Where(Services.StatusTexts.IsRelevant))
+        {
+            Add(report, $"{name}_{status.FileName}", $"{status.State} sha256={status.CurrentSha256 ?? "none"} pending={status.Pending} operations={status.OperationCount}");
+        }
     }
 
     private static void Add(StringBuilder report, string key, string value)

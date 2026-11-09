@@ -64,15 +64,31 @@ public sealed record LauncherSettings
         }
     }
 
-    /// <summary>Selected pack ids in manifest order.</summary>
+    /// <summary>
+    /// The selection in manifest order: the ids of selected packs and, for packs with options, the
+    /// <see cref="Pack.GetSelectionId"/> of each selected option (as <see cref="Manifest.GetOperations"/> takes it).
+    /// </summary>
     public IReadOnlyList<string> GetSelectedPackIds(Manifest manifest)
     {
         var selected = new List<string>();
         foreach (Pack pack in manifest.Packs)
         {
-            if (IsSelected(pack))
+            if (!pack.HasOptions)
             {
-                selected.Add(pack.Id);
+                if (IsSelected(pack))
+                {
+                    selected.Add(pack.Id);
+                }
+
+                continue;
+            }
+
+            foreach (PackOption option in pack.Options)
+            {
+                if (IsSelected(pack, option))
+                {
+                    selected.Add(pack.GetSelectionId(option));
+                }
             }
         }
 
@@ -87,6 +103,17 @@ public sealed record LauncherSettings
         }
 
         return pack.Default;
+    }
+
+    /// <summary>An option the member has not decided on (a new one) uses its manifest default.</summary>
+    public bool IsSelected(Pack pack, PackOption option)
+    {
+        if (PackSelection.TryGetValue(pack.GetSelectionId(option), out bool selected))
+        {
+            return selected;
+        }
+
+        return option.Default;
     }
 
     public bool IsCollapsed(string sectionId)
@@ -105,13 +132,27 @@ public sealed record LauncherSettings
         return this with { CollapsedSections = others.ToArray() };
     }
 
-    /// <summary>Records the choice for every pack of the manifest; choices for packs no longer listed are kept.</summary>
+    /// <summary>
+    /// Records the choice for every pack (and every option of a pack with options) of the manifest; choices for packs
+    /// or options no longer listed are kept. Options are stored as "&lt;pack id&gt;/&lt;option id&gt;", which launchers
+    /// before options never look up.
+    /// </summary>
     public LauncherSettings WithSelection(Manifest manifest, IReadOnlyCollection<string> selectedPackIds)
     {
         var selection = new Dictionary<string, bool>(PackSelection, StringComparer.Ordinal);
         foreach (Pack pack in manifest.Packs)
         {
-            selection[pack.Id] = selectedPackIds.Contains(pack.Id);
+            if (!pack.HasOptions)
+            {
+                selection[pack.Id] = selectedPackIds.Contains(pack.Id);
+                continue;
+            }
+
+            foreach (PackOption option in pack.Options)
+            {
+                string id = pack.GetSelectionId(option);
+                selection[id] = selectedPackIds.Contains(id);
+            }
         }
 
         return this with { PackSelection = selection };

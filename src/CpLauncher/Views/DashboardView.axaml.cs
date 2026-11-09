@@ -9,8 +9,8 @@ namespace CpLauncher.Views;
 
 /// <summary>
 /// The dashboard. The code here only runs the three effects (see <see cref="Effects"/>): the art comes in on
-/// load, the dialog's gem flashes when the state of Icon.utx changes, and after "Zastosuj" installed the changes
-/// the icon slots of the selected packs flash one after another.
+/// load, the dialog's gem flashes when the state of the client files changes, and after "Zastosuj" installed the
+/// changes the icon slots of the selected packs and options flash one after another.
 /// </summary>
 public partial class DashboardView : UserControl
 {
@@ -87,6 +87,12 @@ public partial class DashboardView : UserControl
 
             foreach (Border flash in pack.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("flash") && border.IsEffectivelyVisible))
             {
+                Border? option = flash.GetVisualAncestors().OfType<Border>().FirstOrDefault(border => border.Classes.Contains("option"));
+                if (option?.DataContext is PackOptionViewModel { IsSelected: false })
+                {
+                    continue;
+                }
+
                 Effects.Pulse(flash, delay, SlotFlash);
                 delay += SlotStep;
             }

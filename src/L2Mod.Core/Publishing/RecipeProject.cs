@@ -11,11 +11,21 @@ public enum RecipePackType
     Badge,
     Tag,
     Overlay,
+
+    /// <summary>Skill effect swaps, one option per pair (LineageSkillEffect.u).</summary>
+    EffectSwap,
+
+    /// <summary>The gold click-to-move arrow, no mapping (LineageEffect.u).</summary>
+    GoldClickArrow,
+
+    /// <summary>Icons over the target, one option per skill (LineageSkillEffect.u).</summary>
+    TargetIcon,
 }
 
 /// <summary>
-/// One pack of recipes.json. <see cref="MappingPath"/> is absolute; <see cref="Size"/>, <see cref="Corner"/> and
-/// <see cref="Colors"/> are null when the approved defaults apply (see <see cref="Recipes.RecipeDefaults"/>).
+/// One pack of recipes.json. <see cref="MappingPath"/> is absolute (empty for a type without mapping);
+/// <see cref="Size"/>, <see cref="Corner"/> and <see cref="Colors"/> are null when the approved defaults apply (see
+/// <see cref="Recipes.RecipeDefaults"/>).
 /// </summary>
 public sealed record RecipePack(
     string Id,
@@ -26,7 +36,37 @@ public sealed record RecipePack(
     string MappingPath,
     int? Size,
     IconCorner? Corner,
-    IReadOnlyDictionary<string, Rgb>? Colors);
+    IReadOnlyDictionary<string, Rgb>? Colors)
+{
+    /// <summary>Whether the pack changes icons in Icon.utx (and so has a before/after preview sheet).</summary>
+    public bool IsIconPack
+    {
+        get
+        {
+            return Type is RecipePackType.Badge or RecipePackType.Tag or RecipePackType.Overlay;
+        }
+    }
+
+    /// <summary>The manifest name of a type, as written in recipes.json.</summary>
+    public static string GetTypeName(RecipePackType type)
+    {
+        switch (type)
+        {
+            case RecipePackType.Badge:
+                return "badge";
+            case RecipePackType.Tag:
+                return "tag";
+            case RecipePackType.Overlay:
+                return "overlay";
+            case RecipePackType.EffectSwap:
+                return "effect-swap";
+            case RecipePackType.GoldClickArrow:
+                return "gold-click-arrow";
+            default:
+                return "target-icon";
+        }
+    }
+}
 
 /// <summary>A launcher release to publish with the manifest; <see cref="FilePath"/> is absolute.</summary>
 public sealed record RecipeLauncher(string Version, string FilePath);
@@ -153,20 +193,41 @@ public sealed record RecipeProject(
         RequireObject(element, where);
         CheckFields(element, PackFields, where);
         string typeName = GetRequiredString(element, "type", $"{where}.type");
-        RecipePackType type;
-        switch (typeName)
+        RecipePackType? parsedType = null;
+        foreach (RecipePackType candidate in Enum.GetValues<RecipePackType>())
         {
-            case "badge":
-                type = RecipePackType.Badge;
-                break;
-            case "tag":
-                type = RecipePackType.Tag;
-                break;
-            case "overlay":
-                type = RecipePackType.Overlay;
-                break;
-            default:
-                throw Error($"{where}.type", $"'{typeName}' is not badge, tag or overlay");
+            if (RecipePack.GetTypeName(candidate) == typeName)
+            {
+                parsedType = candidate;
+            }
+        }
+
+        if (parsedType is not RecipePackType type)
+        {
+            string known = string.Join(", ", Enum.GetValues<RecipePackType>().Select(RecipePack.GetTypeName));
+            throw Error($"{where}.type", $"'{typeName}' is not one of {known}");
+        }
+
+        bool iconPack = type is RecipePackType.Badge or RecipePackType.Tag or RecipePackType.Overlay;
+        foreach (string iconField in new[] { "size", "corner" })
+        {
+            if (!iconPack && element.TryGetProperty(iconField, out _))
+            {
+                throw Error($"{where}.{iconField}", $"only icon packs (badge, tag, overlay) have a {iconField}");
+            }
+        }
+
+        string mappingPath = string.Empty;
+        if (type == RecipePackType.GoldClickArrow)
+        {
+            if (element.TryGetProperty("mapping", out _))
+            {
+                throw Error($"{where}.mapping", "a gold-click-arrow pack has no mapping");
+            }
+        }
+        else
+        {
+            mappingPath = ResolvePath(baseDirectory, GetRequiredString(element, "mapping", $"{where}.mapping"));
         }
 
         int? size = null;
@@ -219,7 +280,7 @@ public sealed record RecipeProject(
             description,
             GetOptionalBool(element, "default", $"{where}.default", false),
             type,
-            ResolvePath(baseDirectory, GetRequiredString(element, "mapping", $"{where}.mapping")),
+            mappingPath,
             size,
             corner,
             colors);

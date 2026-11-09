@@ -35,26 +35,10 @@ public sealed class AssetCache
 
     public IAssetStore Store { get; }
 
-    public static IReadOnlyList<OverlayOperation> GetOverlays(Manifest manifest, IReadOnlyCollection<string> packIds)
+    /// <param name="selectedIds">Pack ids and option selection ids, as <see cref="Manifest.GetOperations"/> takes them.</param>
+    public static IReadOnlyList<OverlayOperation> GetOverlays(Manifest manifest, IReadOnlyCollection<string> selectedIds)
     {
-        var overlays = new List<OverlayOperation>();
-        foreach (Pack pack in manifest.Packs)
-        {
-            if (!packIds.Contains(pack.Id))
-            {
-                continue;
-            }
-
-            foreach (IIconOperation operation in pack.Operations)
-            {
-                if (operation is OverlayOperation overlay)
-                {
-                    overlays.Add(overlay);
-                }
-            }
-        }
-
-        return overlays;
+        return manifest.GetOperations(ClientFiles.IconUtx, selectedIds).OfType<OverlayOperation>().ToList();
     }
 
     public bool IsCached(OverlayOperation overlay)

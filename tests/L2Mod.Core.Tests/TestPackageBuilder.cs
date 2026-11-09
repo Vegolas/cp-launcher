@@ -28,6 +28,14 @@ public static class TestPackageBuilder
 
     public static byte[] BuildPlain(params TestTexture[] textures)
     {
+        return BuildPlain(null, textures);
+    }
+
+    /// <param name="materialPackage">When set, every texture carries Lineage 2's material block with its full name
+    /// "&lt;package&gt;.skill_i.&lt;texture&gt;" (93 bytes before the name, 142 after), as in the client's Icon.utx;
+    /// the icons over the target copy that layout.</param>
+    public static byte[] BuildPlain(string? materialPackage, params TestTexture[] textures)
+    {
         var names = new List<string>(FixedNames);
         foreach (TestTexture texture in textures)
         {
@@ -57,7 +65,13 @@ public static class TestPackageBuilder
         foreach (TestTexture texture in textures)
         {
             int textureOffset = (int)stream.Position;
-            byte[] textureData = BuildTextureData(names, texture.Image, texture.MipCount, textureOffset);
+            string? fullName = null;
+            if (materialPackage is not null)
+            {
+                fullName = $"{materialPackage}.skill_i.{texture.Name}";
+            }
+
+            byte[] textureData = BuildTextureData(names, texture.Image, texture.MipCount, textureOffset, fullName);
             stream.Write(textureData);
             textureOffsets.Add(textureOffset);
             textureSizes.Add(textureData.Length);
@@ -119,7 +133,7 @@ public static class TestPackageBuilder
         return image;
     }
 
-    private static byte[] BuildTextureData(List<string> names, RgbaImage image, int mipCount, int absoluteStart)
+    private static byte[] BuildTextureData(List<string> names, RgbaImage image, int mipCount, int absoluteStart, string? fullName)
     {
         using var stream = new MemoryStream();
         var writer = new BinaryWriter(stream);
@@ -143,7 +157,22 @@ public static class TestPackageBuilder
         writer.Write(image.Width);
         WriteCompact(writer, names.IndexOf("None"));
 
-        writer.Write(new byte[] { 0x00, 0x01, 0x00, 0x00, 0x05, 0x08, 0x20, 0x00, 0x01, 0x17, 0x49, 0x63, 0x6F, 0x6E, 0x00, 0x32, 0x03 });
+        if (fullName is null)
+        {
+            writer.Write(new byte[] { 0x00, 0x01, 0x00, 0x00, 0x05, 0x08, 0x20, 0x00, 0x01, 0x17, 0x49, 0x63, 0x6F, 0x6E, 0x00, 0x32, 0x03 });
+        }
+        else
+        {
+            byte[] before = new byte[93];
+            byte[] after = new byte[142];
+            before[0] = 0x07;
+            after[^1] = 0x03;
+            writer.Write(before);
+            WriteCompact(writer, fullName.Length + 1);
+            writer.Write(Encoding.ASCII.GetBytes(fullName));
+            writer.Write((byte)0);
+            writer.Write(after);
+        }
 
         WriteCompact(writer, mipCount);
         int width = image.Width;
