@@ -91,7 +91,7 @@ the pack's `default` for everyone. `gold-click-arrow` is a plain pack with one o
 |---|---|---|
 | `target-icon` | `LineageSkillEffect.u` (appended) | the skill's icon floats up over the target's head for a few seconds when the game plays the skill's effect class on it – on **every** cast that reaches the target, also a resisted one; not a debuff indicator |
 | `effect-swap` | `LineageSkillEffect.u` (in place) | two skills swap their effects both ways (class names and SkillID defaults swap) |
-| `gold-click-arrow` | `LineageEffect.u` (in place) | the click-to-move arrow is gold instead of blue |
+| `gold-click-arrow` | `LineageEffect.u` (in place) | recolours `GstarFX_arrow_click`/`_loop` gold – **no visible change in game** (2026-11-09; L2Dex seems to play another click effect), withdrawn from the recipes |
 
 The icons over the target are copies of the member's **own original** `Icon.utx` icons, so nothing from NCSoft is
 published. Launchers before 1.2.0 skip effect packs (with a note), so publish them with launcher 1.2.0 or later.

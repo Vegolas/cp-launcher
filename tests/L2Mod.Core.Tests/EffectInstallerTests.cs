@@ -115,6 +115,24 @@ public class EffectInstallerTests
     }
 
     [Fact]
+    public void WithdrawnPack_RestoresItsFileEvenWhenTheManifestNoLongerListsThatFile()
+    {
+        _installer.Apply(CreateManifest(), new[] { Badges, Arrow }, _assets);
+        Manifest withdrawn = CreateManifest() with
+        {
+            Packs = CreateManifest().Packs.Where(pack => pack.Id != Arrow).ToList(),
+            SupportedOriginals = CreateManifest().SupportedOriginals.Where(pair => pair.Key != ClientFiles.LineageEffect).ToDictionary(pair => pair.Key, pair => pair.Value),
+        };
+
+        PatchFileStatus status = _installer.GetStatus(withdrawn, new[] { Badges, Arrow })[2];
+        IReadOnlyList<PatchFileResult> results = _installer.Apply(withdrawn, new[] { Badges, Arrow }, _assets);
+
+        Assert.Equal((PatchFileState.OurPatch, PendingAction.Restore, PatchReason.NothingSelected), (status.State, status.Pending, status.Reason));
+        Assert.Equal(new[] { PatchOutcome.Unchanged, PatchOutcome.Unchanged, PatchOutcome.Restored }, results.Select(result => result.Outcome));
+        Assert.Equal(_effects, _fileSystem.ReadAllBytes(ClientPath(ClientFiles.LineageEffect)));
+    }
+
+    [Fact]
     public void Status_LeavesAnUnknownEffectPackageAlone()
     {
         _fileSystem.Seed(ClientPath(ClientFiles.LineageSkillEffect), TestEffectPackages.BuildSkillEffects(new[] { 1071 }));

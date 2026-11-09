@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "2026.11.09.1",
+  "version": "2026.11.09.2",
   "enabled": true,
   "launcher": { "version": "1.2.0", "file": "../work/releases/1.2.0/CpLauncher.exe" },
   "packs": [
@@ -51,13 +51,6 @@
       "default": false,
       "type": "effect-swap",
       "mapping": "../mappings/effect-swaps.txt"
-    },
-    {
-      "id": "gold-click-arrow",
-      "name": "Złota strzałka ruchu",
-      "description": "Strzałka w miejscu kliknięcia przy chodzeniu jest złota zamiast niebieskiej.",
-      "default": false,
-      "type": "gold-click-arrow"
     }
   ],
   "announcements": [],
